@@ -1,48 +1,34 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { ArrowLeft, Check, ChevronDown, Plus, UserPlus } from "lucide-react";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/features/auth/hooks/use-auth";
-import { AddProjectMemberDialog } from "@/features/projects/components/add-project-member-dialog";
-import { useAddProjectMember } from "@/features/projects/hooks/use-add-project-member";
-import { useProjectById } from "@/features/projects/hooks/use-project-by-id";
-import { useProjectMembers } from "@/features/projects/hooks/use-project-members";
-import { useProjectTasks } from "@/features/projects/hooks/use-project-tasks";
-import {
-  getTaskStatusClassName,
-  getTaskStatusLabel,
-} from "@/features/projects/lib/task-status";
-import { AddTaskAssigneeDialog } from "@/features/tasks/components/add-task-assignee-dialog";
-import { CreateTaskDialog } from "@/features/tasks/components/create-task-dialog";
-import { useAddTaskAssignee } from "@/features/tasks/hooks/use-add-task-assignee";
-import { useCreateTask } from "@/features/tasks/hooks/use-create-task";
-import { useUpdateTaskAssigneeStatus } from "@/features/tasks/hooks/use-update-task-assignee-status";
-import type { CreateTaskFormValues } from "@/features/tasks/schema/create-task.schema";
-import { useUsers } from "@/features/users/hooks/use-users";
-import { getSocket } from "@/lib/socket/socket-client";
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { AddProjectMemberDialog } from '@/features/projects/components/add-project-member-dialog';
+import { ProjectDetailHeader } from '@/features/projects/components/project-detail-header';
+import { ProjectInfoCard } from '@/features/projects/components/project-info-card';
+import { useAddProjectMember } from '@/features/projects/hooks/use-add-project-member';
+import { useProjectById } from '@/features/projects/hooks/use-project-by-id';
+import { useProjectMembers } from '@/features/projects/hooks/use-project-members';
+import { useProjectTasks } from '@/features/projects/hooks/use-project-tasks';
+import { AddTaskAssigneeDialog } from '@/features/tasks/components/add-task-assignee-dialog';
+import { CreateTaskDialog } from '@/features/tasks/components/create-task-dialog';
+import { ProjectTasksCard } from '@/features/tasks/components/project-tasks-card';
+import { useAddTaskAssignee } from '@/features/tasks/hooks/use-add-task-assignee';
+import { useCreateTask } from '@/features/tasks/hooks/use-create-task';
+import { useUpdateTaskAssigneeStatus } from '@/features/tasks/hooks/use-update-task-assignee-status';
+import type { CreateTaskFormValues } from '@/features/tasks/schema/create-task.schema';
+import { useUsers } from '@/features/users/hooks/use-users';
+import { getSocket } from '@/lib/socket/socket-client';
 import {
   socketClientEvents,
   socketServerEvents,
-} from "@/lib/socket/socket-events";
-import { formatDateTime } from "@/lib/utils/format-date";
-import {
-  taskStatuses,
-  type Task,
-  type TaskAssignee,
-  type TaskStatus,
-} from "@/types/task";
+} from '@/lib/socket/socket-events';
+import type { Task, TaskStatus } from '@/types/task';
 
 export default function ProjectDetailPage(): React.JSX.Element {
   const params = useParams<{ id: string }>();
@@ -50,7 +36,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const queryClient = useQueryClient();
 
   const { user, accessToken, isAuthenticated } = useAuth();
-  const isTeamLead = user?.role === "TEAM_LEAD";
+  const isTeamLead = user?.role === 'TEAM_LEAD';
 
   const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
@@ -60,11 +46,11 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const projectQuery = useProjectById(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId, {
-  enabled: isTeamLead,
-});
-const usersQuery = useUsers({
-  enabled: isTeamLead,
-});
+    enabled: isTeamLead,
+  });
+  const usersQuery = useUsers({
+    enabled: isTeamLead,
+  });
 
   const createTaskMutation = useCreateTask(projectId);
   const addTaskAssigneeMutation = useAddTaskAssignee();
@@ -83,7 +69,7 @@ const usersQuery = useUsers({
           ? `${member.user.firstName} ${member.user.lastName}`.trim()
           : `User ${member.userId.slice(0, 8)}`;
 
-        return [member.userId, fullName];
+        return [member.userId, fullName] as const;
       }),
     );
   }, [members]);
@@ -120,11 +106,11 @@ const usersQuery = useUsers({
       }
 
       void queryClient.invalidateQueries({
-        queryKey: ["project", projectId, "tasks"],
+        queryKey: ['project', projectId, 'tasks'],
       });
     };
 
-    socket.on("connect", handleConnect);
+    socket.on('connect', handleConnect);
     socket.on(
       socketServerEvents.taskAssignmentStatusChanged,
       handleTaskAssignmentStatusChanged,
@@ -137,7 +123,7 @@ const usersQuery = useUsers({
     }
 
     return () => {
-      socket.off("connect", handleConnect);
+      socket.off('connect', handleConnect);
       socket.off(
         socketServerEvents.taskAssignmentStatusChanged,
         handleTaskAssignmentStatusChanged,
@@ -159,7 +145,7 @@ const usersQuery = useUsers({
     }
 
     if (project.isArchived) {
-      toast.error("You cannot create tasks in an archived project.");
+      toast.error('You cannot create tasks in an archived project.');
       return;
     }
 
@@ -207,18 +193,18 @@ const usersQuery = useUsers({
     });
   };
 
-  const getAssigneeLabel = (assignee: TaskAssignee): string => {
-    if (assignee.userId === user?.id) {
-      return "You";
+  const getAssigneeLabel = (assigneeUserId: string): string => {
+    if (assigneeUserId === user?.id) {
+      return 'You';
     }
 
-    const memberName = memberNameMap.get(assignee.userId);
+    const memberName = memberNameMap.get(assigneeUserId);
 
     if (memberName) {
       return memberName;
     }
 
-    return `User ${assignee.userId.slice(0, 8)}`;
+    return `User ${assigneeUserId.slice(0, 8)}`;
   };
 
   const canUpdateAssigneeStatus = (assigneeUserId: string): boolean => {
@@ -302,262 +288,44 @@ const usersQuery = useUsers({
         </Link>
       </div>
 
-      <section className="rounded-3xl border border-border/60 bg-card/95 p-6 shadow-sm">
-        <div className="space-y-3">
-          <div className="inline-flex items-center rounded-full border border-border/60 bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-            Project Detail
-          </div>
-
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {project.name}
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                {project.description ?? "No project description provided."}
-              </p>
-            </div>
-
-            {isTeamLead ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsAddMemberDialogOpen(true);
-                  }}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add Member
-                </Button>
-
-                <Button
-                  onClick={() => {
-                    setIsCreateTaskDialogOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Task
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      <ProjectDetailHeader
+        project={project}
+        isTeamLead={isTeamLead}
+        onAddMember={() => {
+          setIsAddMemberDialogOpen(true);
+        }}
+        onCreateTask={() => {
+          setIsCreateTaskDialogOpen(true);
+        }}
+      />
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-3xl border border-border/60 bg-card/95 p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">
-            Project Info
-          </h2>
+        <ProjectInfoCard
+          project={project}
+          isTeamLead={isTeamLead}
+          memberCount={members.length}
+        />
 
-          <dl className="mt-5 space-y-4">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                Created At
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                {formatDateTime(project.createdAt)}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                Updated At
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                {formatDateTime(project.updatedAt)}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                Archived
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                {project.isArchived ? "Yes" : "No"}
-              </dd>
-            </div>
-
-            {isTeamLead ? (
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Members
-                </dt>
-                <dd className="mt-1 text-sm text-foreground">
-                  {members.length}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        </div>
-
-        <div className="rounded-3xl border border-border/60 bg-card/95 p-6 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Tasks</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {tasks.length} task{tasks.length === 1 ? "" : "s"} in this
-                project
-              </p>
-            </div>
-          </div>
-
-          {tasks.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">
-              No tasks found for this project.
-            </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {tasks.map((task) => {
-                const assignees = Array.isArray(task.assignees)
-                  ? task.assignees
-                  : [];
-
-                return (
-                  <article
-                    key={task.id}
-                    className="rounded-2xl border border-border/60 bg-muted/20 p-4"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-semibold text-foreground">
-                          {task.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {task.description ?? "No task description provided."}
-                        </p>
-                      </div>
-
-                      <div
-                        className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-medium ${getTaskStatusClassName(
-                          task.status,
-                        )}`}
-                      >
-                        {getTaskStatusLabel(task.status)}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 text-xs text-muted-foreground">
-                      {assignees.length} assignee
-                      {assignees.length === 1 ? "" : "s"}
-                    </div>
-
-                    {assignees.length > 0 ? (
-                      <div className="mt-4 space-y-3">
-                        {assignees.map((assignee) => {
-                          const isUpdatingCurrentAssignee =
-                            updateTaskAssigneeStatusMutation.isPending &&
-                            updateTaskAssigneeStatusMutation.variables
-                              ?.taskId === task.id &&
-                            updateTaskAssigneeStatusMutation.variables
-                              ?.userId === assignee.userId;
-
-                          return (
-                            <div
-                              key={assignee.userId}
-                              className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/60 p-3 sm:flex-row sm:items-center sm:justify-between"
-                            >
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium text-foreground">
-                                  {getAssigneeLabel(assignee)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Current status:{" "}
-                                  {getTaskStatusLabel(assignee.status)}
-                                </p>
-                              </div>
-
-                              {canUpdateAssigneeStatus(assignee.userId) ? (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className={`min-w-[220px] justify-between rounded-xl ${getTaskStatusClassName(
-                                        assignee.status,
-                                      )}`}
-                                      disabled={isUpdatingCurrentAssignee}
-                                    >
-                                      <span>
-                                        {getTaskStatusLabel(assignee.status)}
-                                      </span>
-                                      <ChevronDown className="ml-2 h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-
-                                  <DropdownMenuContent
-                                    align="end"
-                                    className="w-[220px]"
-                                  >
-                                    {taskStatuses.map((status) => {
-                                      const isCurrentStatus =
-                                        status === assignee.status;
-
-                                      return (
-                                        <DropdownMenuItem
-                                          key={status}
-                                          disabled={isCurrentStatus}
-                                          onClick={() => {
-                                            if (isCurrentStatus) {
-                                              return;
-                                            }
-
-                                            void handleAssignmentStatusChange(
-                                              task.id,
-                                              assignee.userId,
-                                              status,
-                                            );
-                                          }}
-                                          className="flex items-center justify-between"
-                                        >
-                                          <span>
-                                            {getTaskStatusLabel(status)}
-                                          </span>
-
-                                          {isCurrentStatus ? (
-                                            <Check className="h-4 w-4" />
-                                          ) : null}
-                                        </DropdownMenuItem>
-                                      );
-                                    })}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              ) : (
-                                <div
-                                  className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-medium ${getTaskStatusClassName(
-                                    assignee.status,
-                                  )}`}
-                                >
-                                  {getTaskStatusLabel(assignee.status)}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {isTeamLead ? (
-                      <div className="mt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedTaskForAssignee(task);
-                          }}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Add assignee
-                        </Button>
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <ProjectTasksCard
+          tasks={tasks}
+          isTeamLead={isTeamLead}
+          isUpdatingTaskId={
+            updateTaskAssigneeStatusMutation.isPending
+              ? updateTaskAssigneeStatusMutation.variables?.taskId
+              : undefined
+          }
+          isUpdatingUserId={
+            updateTaskAssigneeStatusMutation.isPending
+              ? updateTaskAssigneeStatusMutation.variables?.userId
+              : undefined
+          }
+          getAssigneeLabel={getAssigneeLabel}
+          canUpdateAssigneeStatus={canUpdateAssigneeStatus}
+          onAssignmentStatusChange={handleAssignmentStatusChange}
+          onAddAssignee={(task) => {
+            setSelectedTaskForAssignee(task);
+          }}
+        />
       </section>
 
       <CreateTaskDialog
@@ -585,13 +353,13 @@ const usersQuery = useUsers({
         }}
         task={
           selectedTaskForAssignee ?? {
-            id: "",
+            id: '',
             projectId,
-            title: "",
+            title: '',
             description: null,
-            status: "PENDING",
-            createdAt: "",
-            updatedAt: "",
+            status: 'PENDING',
+            createdAt: '',
+            updatedAt: '',
             assignees: [],
           }
         }
