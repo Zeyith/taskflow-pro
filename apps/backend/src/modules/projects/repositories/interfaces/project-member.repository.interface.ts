@@ -11,6 +11,11 @@ export interface IProjectMemberRepository {
     projectId: string,
     userId: string,
   ): Promise<ProjectMember | null>;
+  findAnyMembership(
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectMember | null>;
+  restore(projectId: string, userId: string): Promise<ProjectMember | null>;
   findProjectsByUserId(
     userId: string,
     limit: number,

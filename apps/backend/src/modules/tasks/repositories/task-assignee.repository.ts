@@ -5,12 +5,14 @@ import { DATABASE_CONNECTION } from '../../../core/database/database.module';
 import type { AppDb } from '../../../core/database/database.types';
 import {
   taskAssignees,
+  tasks,
   type NewTaskAssigneeRow,
   type TaskAssigneeRow,
 } from '../../../core/database/schema';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import type {
   ITaskAssigneeRepository,
+  RestoreTaskAssigneePayload,
   UpdateTaskAssigneePayload,
 } from './interfaces/task-assignee.repository.interface';
 
@@ -82,6 +84,56 @@ export class TaskAssigneeRepository implements ITaskAssigneeRepository {
     return this.toDomain(row);
   }
 
+  async findAnyByTaskIdAndUserId(
+    taskId: string,
+    userId: string,
+  ): Promise<TaskAssignee | null> {
+    const [row] = await this.db
+      .select()
+      .from(taskAssignees)
+      .where(
+        and(
+          eq(taskAssignees.taskId, taskId),
+          eq(taskAssignees.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return null;
+    }
+
+    return this.toDomain(row);
+  }
+
+  async restoreByTaskIdAndUserId(
+    taskId: string,
+    userId: string,
+    payload: RestoreTaskAssigneePayload,
+  ): Promise<TaskAssignee | null> {
+    const [restoredRow] = await this.db
+      .update(taskAssignees)
+      .set({
+        addedBy: payload.addedBy,
+        status: payload.status,
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(taskAssignees.taskId, taskId),
+          eq(taskAssignees.userId, userId),
+        ),
+      )
+      .returning();
+
+    if (!restoredRow) {
+      return null;
+    }
+
+    return this.toDomain(restoredRow);
+  }
+
   async updateById(
     id: string,
     payload: UpdateTaskAssigneePayload,
@@ -125,6 +177,40 @@ export class TaskAssigneeRepository implements ITaskAssigneeRepository {
           isNull(taskAssignees.deletedAt),
         ),
       );
+  }
+
+  async softDeleteByProjectIdAndUserId(
+    projectId: string,
+    userId: string,
+  ): Promise<void> {
+    const projectTasks = await this.db
+      .select({
+        id: tasks.id,
+      })
+      .from(tasks)
+      .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
+
+    if (projectTasks.length === 0) {
+      return;
+    }
+
+    const taskIds = projectTasks.map((task) => task.id);
+
+    for (const taskId of taskIds) {
+      await this.db
+        .update(taskAssignees)
+        .set({
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(taskAssignees.taskId, taskId),
+            eq(taskAssignees.userId, userId),
+            isNull(taskAssignees.deletedAt),
+          ),
+        );
+    }
   }
 
   private toDomain(row: TaskAssigneeRow): TaskAssignee {

@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
+import { TasksModule } from '../tasks/tasks.module';
 import { ProjectsController } from './projects.controller';
 import { ProjectMemberRepository } from './repositories/project-member.repository';
 import { ProjectRepository } from './repositories/project.repository';
@@ -8,6 +9,7 @@ import { PROJECT_REPOSITORY } from './repositories/interfaces/project.repository
 import { ProjectsService } from './projects.service';
 
 @Module({
+  imports: [forwardRef(() => TasksModule)],
   controllers: [ProjectsController],
   providers: [
     ProjectsService,

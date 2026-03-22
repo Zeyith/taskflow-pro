@@ -3,6 +3,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { BusinessRuleError } from '../../common/exceptions/business-rule.exception';
 import { NotFoundError } from '../../common/exceptions/not-found.exception';
 import type { UserRole } from '../../common/types/user-role.type';
+import { CacheKey } from '../../core/cache/cache.constants';
+import { CacheService } from '../../core/cache/cache.service';
+import {
+  TASK_ASSIGNEE_REPOSITORY,
+  type ITaskAssigneeRepository,
+} from '../tasks/repositories/interfaces/task-assignee.repository.interface';
 import {
   PROJECT_MEMBER_REPOSITORY,
   type IProjectMemberRepository,
@@ -41,6 +47,9 @@ export class ProjectsService {
     private readonly projectRepository: IProjectRepository,
     @Inject(PROJECT_MEMBER_REPOSITORY)
     private readonly projectMemberRepository: IProjectMemberRepository,
+    @Inject(TASK_ASSIGNEE_REPOSITORY)
+    private readonly taskAssigneeRepository: ITaskAssigneeRepository,
+    private readonly cacheService: CacheService,
   ) {}
 
   async create(input: CreateProjectInput) {
@@ -108,14 +117,35 @@ export class ProjectsService {
       throw new NotFoundError('Project not found');
     }
 
-    const existingMembership =
+    const existingActiveMembership =
       await this.projectMemberRepository.findActiveMembership(
         input.projectId,
         input.userId,
       );
 
-    if (existingMembership) {
+    if (existingActiveMembership) {
       throw new BusinessRuleError('User is already a member of this project');
+    }
+
+    const existingMembership =
+      await this.projectMemberRepository.findAnyMembership(
+        input.projectId,
+        input.userId,
+      );
+
+    if (existingMembership) {
+      const restoredMembership = await this.projectMemberRepository.restore(
+        input.projectId,
+        input.userId,
+      );
+
+      if (!restoredMembership) {
+        throw new NotFoundError('Project member could not be restored');
+      }
+
+      await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+      return this.toProjectMemberResponse(restoredMembership);
     }
 
     const membership = await this.projectMemberRepository.create({
@@ -123,6 +153,8 @@ export class ProjectsService {
       userId: input.userId,
       addedBy: input.addedBy,
     });
+
+    await this.cacheService.del(CacheKey.projectTasks(input.projectId));
 
     return this.toProjectMemberResponse(membership);
   }
@@ -134,7 +166,7 @@ export class ProjectsService {
       throw new NotFoundError('Project not found');
     }
 
-    const membership = await this.projectMemberRepository.softDelete(
+    const membership = await this.projectMemberRepository.findActiveMembership(
       input.projectId,
       input.userId,
     );
@@ -143,7 +175,23 @@ export class ProjectsService {
       throw new NotFoundError('Project member not found');
     }
 
-    return this.toProjectMemberResponse(membership);
+    const deletedMembership = await this.projectMemberRepository.softDelete(
+      input.projectId,
+      input.userId,
+    );
+
+    if (!deletedMembership) {
+      throw new NotFoundError('Project member not found');
+    }
+
+    await this.taskAssigneeRepository.softDeleteByProjectIdAndUserId(
+      input.projectId,
+      input.userId,
+    );
+
+    await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+    return this.toProjectMemberResponse(deletedMembership);
   }
 
   async listMembers(projectId: string) {

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 import { ProjectsModule } from '../projects/projects.module';
 import { TasksController } from './tasks.controller';
@@ -11,7 +11,7 @@ import { TASK_REPOSITORY } from './repositories/interfaces/task.repository.inter
 import { TASK_STATUS_HISTORY_REPOSITORY } from './repositories/interfaces/task-status-history.repository.interface';
 
 @Module({
-  imports: [ProjectsModule],
+  imports: [forwardRef(() => ProjectsModule)],
   controllers: [TasksController],
   providers: [
     TasksService,

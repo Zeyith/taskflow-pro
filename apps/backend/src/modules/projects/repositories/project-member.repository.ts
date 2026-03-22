@@ -80,6 +80,53 @@ export class ProjectMemberRepository implements IProjectMemberRepository {
     return this.toDomain(row);
   }
 
+  async findAnyMembership(
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectMember | null> {
+    const [row] = await this.db
+      .select()
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, userId),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return null;
+    }
+
+    return this.toDomain(row);
+  }
+
+  async restore(
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectMember | null> {
+    const [updatedRow] = await this.db
+      .update(projectMembers)
+      .set({
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.userId, userId),
+        ),
+      )
+      .returning();
+
+    if (!updatedRow) {
+      return null;
+    }
+
+    return this.toDomain(updatedRow);
+  }
+
   async findProjectsByUserId(
     userId: string,
     limit: number,
