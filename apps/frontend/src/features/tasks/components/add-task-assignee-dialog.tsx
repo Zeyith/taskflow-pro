@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { Loader2, UserPlus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Loader2, UserPlus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-import { Button } from "@/components/ui/button";
+import { SearchableSelect } from '@/components/shared/searchable-select';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -11,9 +12,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import type { ProjectMember } from "@/types/project-member";
-import type { Task } from "@/types/task";
+} from '@/components/ui/dialog';
+import type { ProjectMember } from '@/types/project-member';
+import type { Task } from '@/types/task';
 
 type AddTaskAssigneeDialogProps = {
   open: boolean;
@@ -32,7 +33,7 @@ export function AddTaskAssigneeDialog({
   isSubmitting = false,
   onSubmit,
 }: AddTaskAssigneeDialogProps): React.JSX.Element {
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState('');
 
   const safeAssignees = Array.isArray(task.assignees) ? task.assignees : [];
 
@@ -49,18 +50,30 @@ export function AddTaskAssigneeDialog({
     return !assignedUserIds.has(member.userId);
   });
 
-  const handleClose = () => {
-    setSelectedUserId("");
+  const selectableMembers = availableMembers.map((member) => {
+    const fullName = member.user
+      ? `${member.user.firstName} ${member.user.lastName}`.trim()
+      : member.userId;
+
+    return {
+      value: member.userId,
+      label: fullName,
+      description: member.user?.email ?? undefined,
+    };
+  });
+
+  const handleClose = (): void => {
+    setSelectedUserId('');
     onOpenChange(false);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!selectedUserId) {
       return;
     }
 
     await onSubmit(selectedUserId);
-    setSelectedUserId("");
+    setSelectedUserId('');
   };
 
   return (
@@ -68,7 +81,7 @@ export function AddTaskAssigneeDialog({
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          setSelectedUserId("");
+          setSelectedUserId('');
         }
 
         onOpenChange(nextOpen);
@@ -105,35 +118,15 @@ export function AddTaskAssigneeDialog({
                 Project member
               </label>
 
-              <select
-                id={`assignee-select-${task.id}`}
+              <SearchableSelect
                 value={selectedUserId}
-                onChange={(event) => {
-                  setSelectedUserId(event.target.value);
-                }}
-                className="flex h-10 w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none"
+                onChange={setSelectedUserId}
+                options={selectableMembers}
+                placeholder="Select a member"
+                searchPlaceholder="Search members..."
+                emptyText="No member found."
                 disabled={isSubmitting}
-              >
-                <option value="" className="bg-zinc-950 text-zinc-400">
-                  Select a member
-                </option>
-
-                {availableMembers.map((member) => {
-                  const fullName = member.user
-                    ? `${member.user.firstName} ${member.user.lastName}`
-                    : member.userId;
-
-                  return (
-                    <option
-                      key={member.id}
-                      value={member.userId}
-                      className="bg-zinc-950 text-white"
-                    >
-                      {fullName}
-                    </option>
-                  );
-                })}
-              </select>
+              />
             </div>
           )}
         </div>
@@ -156,7 +149,9 @@ export function AddTaskAssigneeDialog({
               void handleSubmit();
             }}
             disabled={
-              isSubmitting || !selectedUserId || availableMembers.length === 0
+              isSubmitting ||
+              !selectedUserId ||
+              availableMembers.length === 0
             }
           >
             {isSubmitting ? (

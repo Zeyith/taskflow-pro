@@ -3,6 +3,7 @@
 import { Loader2, UserPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { SearchableSelect } from '@/components/shared/searchable-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -43,12 +44,18 @@ export function AddProjectMemberDialog({
     (user) => !existingMemberUserIds.has(user.id),
   );
 
-  const handleClose = () => {
+  const selectableUsers = availableUsers.map((user) => ({
+    value: user.id,
+    label: `${user.firstName} ${user.lastName}`.trim(),
+    description: user.email,
+  }));
+
+  const handleClose = (): void => {
     setSelectedUserId('');
     onOpenChange(false);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!selectedUserId) {
       return;
     }
@@ -91,29 +98,15 @@ export function AddProjectMemberDialog({
               User
             </label>
 
-            <select
-              id="project-member-select"
+            <SearchableSelect
               value={selectedUserId}
-              onChange={(event) => {
-                setSelectedUserId(event.target.value);
-              }}
-              className="flex h-10 w-full rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none"
+              onChange={setSelectedUserId}
+              options={selectableUsers}
+              placeholder="Select a user"
+              searchPlaceholder="Search users..."
+              emptyText="No user found."
               disabled={isSubmitting}
-            >
-              <option value="" className="bg-zinc-950 text-zinc-400">
-                Select a user
-              </option>
-
-              {availableUsers.map((user) => (
-                <option
-                  key={user.id}
-                  value={user.id}
-                  className="bg-zinc-950 text-white"
-                >
-                  {user.firstName} {user.lastName} — {user.email}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         )}
 
@@ -134,7 +127,11 @@ export function AddProjectMemberDialog({
             onClick={() => {
               void handleSubmit();
             }}
-            disabled={isSubmitting || !selectedUserId || availableUsers.length === 0}
+            disabled={
+              isSubmitting ||
+              !selectedUserId ||
+              availableUsers.length === 0
+            }
           >
             {isSubmitting ? (
               <>
