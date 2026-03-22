@@ -12,7 +12,6 @@ import {
   User,
   Users,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -35,7 +34,6 @@ import {
 } from '@/features/auth/schemas/register.schema';
 
 export function RegisterForm(): React.JSX.Element {
-  const router = useRouter();
   const registerMutation = useRegister();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -52,7 +50,6 @@ export function RegisterForm(): React.JSX.Element {
 
   async function onSubmit(values: RegisterFormValues): Promise<void> {
     await registerMutation.mutateAsync(values);
-    router.replace(appRoutes.login);
   }
 
   return (
