@@ -1,0 +1,12 @@
+{
+"name": "taskflow-pro",
+"private": true,
+"version": "1.0.0",
+"packageManager": "pnpm@10.29.2",
+"scripts": {
+"dev:backend": "pnpm --dir apps/backend start:dev",
+"dev:frontend": "pnpm --dir apps/frontend dev",
+"build:backend": "pnpm --dir apps/backend build",
+"build:frontend": "pnpm --dir apps/frontend build"
+}
+}
