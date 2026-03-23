@@ -257,14 +257,6 @@ export default function ProjectDetailPage(): React.JSX.Element {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to archive this project?",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
       await archiveProjectMutation.mutateAsync(project.id);
     } catch {
@@ -279,14 +271,6 @@ export default function ProjectDetailPage(): React.JSX.Element {
 
     if (!project.isArchived) {
       toast.error("Only archived projects can be deleted.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "This will permanently delete the archived project. Are you sure?",
-    );
-
-    if (!confirmed) {
       return;
     }
 
