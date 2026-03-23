@@ -9,6 +9,18 @@ type ProjectInfoCardProps = {
   memberCount: number;
 };
 
+function getProjectCreatorLabel(project: Project): string {
+  if (project.createdByUser) {
+    return `${project.createdByUser.firstName} ${project.createdByUser.lastName}`.trim();
+  }
+
+  if (project.createdBy) {
+    return `User ${project.createdBy.slice(0, 8)}`;
+  }
+
+  return 'Unknown';
+}
+
 export function ProjectInfoCard({
   project,
   isTeamLead,
@@ -19,6 +31,15 @@ export function ProjectInfoCard({
       <h2 className="text-sm font-semibold text-foreground">Project Info</h2>
 
       <dl className="mt-5 space-y-4">
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+            Created By
+          </dt>
+          <dd className="mt-1 text-sm text-foreground">
+            {getProjectCreatorLabel(project)}
+          </dd>
+        </div>
+
         <div>
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">
             Created At

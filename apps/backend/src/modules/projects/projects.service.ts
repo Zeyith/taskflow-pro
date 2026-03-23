@@ -24,6 +24,12 @@ type CreateProjectInput = {
   createdBy: string;
 };
 
+type UpdateProjectInput = {
+  projectId: string;
+  name?: string;
+  description?: string | null;
+};
+
 type RequestUserContext = {
   userId: string;
   role: UserRole;
@@ -106,14 +112,76 @@ export class ProjectsService {
     return this.toResponse(project);
   }
 
+  async update(input: UpdateProjectInput) {
+    const project = await this.projectRepository.findById(input.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError('Archived projects cannot be updated');
+    }
+
+    const updatedProject = await this.projectRepository.update(
+      input.projectId,
+      {
+        name: input.name,
+        description: input.description,
+      },
+    );
+
+    if (!updatedProject) {
+      throw new NotFoundError('Project not found');
+    }
+
+    await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+    return this.toResponse(updatedProject);
+  }
+
   async archive(id: string) {
+    const existingProject = await this.projectRepository.findById(id);
+
+    if (!existingProject) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (existingProject.isArchived) {
+      throw new BusinessRuleError('Project is already archived');
+    }
+
     const project = await this.projectRepository.archive(id);
 
     if (!project) {
       throw new NotFoundError('Project not found');
     }
 
+    await this.cacheService.del(CacheKey.projectTasks(id));
+
     return this.toResponse(project);
+  }
+
+  async softDelete(id: string) {
+    const project = await this.projectRepository.findById(id);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (!project.isArchived) {
+      throw new BusinessRuleError('Only archived projects can be deleted');
+    }
+
+    const deletedProject = await this.projectRepository.softDelete(id);
+
+    if (!deletedProject) {
+      throw new NotFoundError('Project not found');
+    }
+
+    await this.cacheService.del(CacheKey.projectTasks(id));
+
+    return this.toResponse(deletedProject);
   }
 
   async addMember(input: AddProjectMemberInput) {
@@ -228,6 +296,7 @@ export class ProjectsService {
     isArchived: boolean;
     createdAt: Date;
     updatedAt: Date;
+    deletedAt: Date | null;
   }) {
     return {
       id: project.id,
@@ -238,6 +307,7 @@ export class ProjectsService {
       isArchived: project.isArchived,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+      deletedAt: project.deletedAt,
     };
   }
 

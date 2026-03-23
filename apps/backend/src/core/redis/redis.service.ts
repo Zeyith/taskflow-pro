@@ -67,18 +67,17 @@ export class RedisService implements OnApplicationShutdown {
   }
 
   eval<T>(
+    //eval = küçük bir mini senaryo/script çalıştırmak
     script: string,
     keys: string[],
     args: Array<string | number>,
   ): Promise<T> {
-    const result = this.client.eval(
+    return this.client.eval(
       script,
       keys.length,
       ...keys,
       ...args,
-    ) as unknown;
-
-    return result as Promise<T>;
+    ) as Promise<T>;
   }
 
   async onApplicationShutdown(): Promise<void> {

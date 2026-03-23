@@ -11,7 +11,10 @@ import {
   type UserRow,
 } from '../../../core/database/schema';
 import { Project } from '../entities/project.entity';
-import { type IProjectRepository } from './interfaces/project.repository.interface';
+import {
+  type IProjectRepository,
+  type UpdateProjectRepositoryPayload,
+} from './interfaces/project.repository.interface';
 
 @Injectable()
 export class ProjectRepository implements IProjectRepository {
@@ -30,42 +33,17 @@ export class ProjectRepository implements IProjectRepository {
       throw new Error('Project creation failed');
     }
 
-    const [projectWithCreator] = await this.db
-      .select({
-        project: projects,
-        creator: users,
-      })
-      .from(projects)
-      .leftJoin(users, eq(projects.createdBy, users.id))
-      .where(and(eq(projects.id, createdRow.id), isNull(projects.deletedAt)))
-      .limit(1);
+    const projectWithCreator = await this.findProjectWithCreator(createdRow.id);
 
-    if (!projectWithCreator) {
+    if (projectWithCreator === null) {
       return this.toDomain(createdRow);
     }
 
-    return this.toDomainWithCreator(
-      projectWithCreator.project,
-      projectWithCreator.creator,
-    );
+    return projectWithCreator;
   }
 
   async findById(id: string): Promise<Project | null> {
-    const [row] = await this.db
-      .select({
-        project: projects,
-        creator: users,
-      })
-      .from(projects)
-      .leftJoin(users, eq(projects.createdBy, users.id))
-      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
-      .limit(1);
-
-    if (!row) {
-      return null;
-    }
-
-    return this.toDomainWithCreator(row.project, row.creator);
+    return this.findProjectWithCreator(id);
   }
 
   async findAll(limit: number, offset: number): Promise<Project[]> {
@@ -99,24 +77,89 @@ export class ProjectRepository implements IProjectRepository {
       return null;
     }
 
-    const [projectWithCreator] = await this.db
+    const projectWithCreator = await this.findProjectWithCreator(updatedRow.id);
+
+    if (projectWithCreator === null) {
+      return this.toDomain(updatedRow);
+    }
+
+    return projectWithCreator;
+  }
+
+  async update(
+    id: string,
+    payload: UpdateProjectRepositoryPayload,
+  ): Promise<Project | null> {
+    const updatePayload: {
+      name?: string;
+      description?: string | null;
+      updatedAt: Date;
+    } = {
+      updatedAt: new Date(),
+    };
+
+    if (payload.name !== undefined) {
+      updatePayload.name = payload.name;
+    }
+
+    if (payload.description !== undefined) {
+      updatePayload.description = payload.description;
+    }
+
+    const [updatedRow] = await this.db
+      .update(projects)
+      .set(updatePayload)
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
+      .returning();
+
+    if (!updatedRow) {
+      return null;
+    }
+
+    const projectWithCreator = await this.findProjectWithCreator(updatedRow.id);
+
+    if (projectWithCreator === null) {
+      return this.toDomain(updatedRow);
+    }
+
+    return projectWithCreator;
+  }
+
+  async softDelete(id: string): Promise<Project | null> {
+    const now = new Date();
+
+    const [updatedRow] = await this.db
+      .update(projects)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
+      .returning();
+
+    if (!updatedRow) {
+      return null;
+    }
+
+    return this.toDomain(updatedRow);
+  }
+
+  private async findProjectWithCreator(id: string): Promise<Project | null> {
+    const [row] = await this.db
       .select({
         project: projects,
         creator: users,
       })
       .from(projects)
       .leftJoin(users, eq(projects.createdBy, users.id))
-      .where(and(eq(projects.id, updatedRow.id), isNull(projects.deletedAt)))
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
       .limit(1);
 
-    if (!projectWithCreator) {
-      return this.toDomain(updatedRow);
+    if (!row) {
+      return null;
     }
 
-    return this.toDomainWithCreator(
-      projectWithCreator.project,
-      projectWithCreator.creator,
-    );
+    return this.toDomainWithCreator(row.project, row.creator);
   }
 
   private toDomain(row: ProjectRow): Project {

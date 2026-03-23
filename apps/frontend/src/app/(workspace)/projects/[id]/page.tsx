@@ -11,15 +11,18 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { AddProjectMemberDialog } from '@/features/projects/components/add-project-member-dialog';
 import { ProjectDetailHeader } from '@/features/projects/components/project-detail-header';
 import { ProjectInfoCard } from '@/features/projects/components/project-info-card';
+import { ProjectMembersCard } from '@/features/projects/components/project-members-card';
 import { useAddProjectMember } from '@/features/projects/hooks/use-add-project-member';
 import { useProjectById } from '@/features/projects/hooks/use-project-by-id';
 import { useProjectMembers } from '@/features/projects/hooks/use-project-members';
 import { useProjectTasks } from '@/features/projects/hooks/use-project-tasks';
+import { useRemoveProjectMember } from '@/features/projects/hooks/use-remove-project-member';
 import { AddTaskAssigneeDialog } from '@/features/tasks/components/add-task-assignee-dialog';
 import { CreateTaskDialog } from '@/features/tasks/components/create-task-dialog';
 import { ProjectTasksCard } from '@/features/tasks/components/project-tasks-card';
 import { useAddTaskAssignee } from '@/features/tasks/hooks/use-add-task-assignee';
 import { useCreateTask } from '@/features/tasks/hooks/use-create-task';
+import { useRemoveTaskAssignee } from '@/features/tasks/hooks/use-remove-task-assignee';
 import { useUpdateTaskAssigneeStatus } from '@/features/tasks/hooks/use-update-task-assignee-status';
 import type { CreateTaskFormValues } from '@/features/tasks/schema/create-task.schema';
 import { useUsers } from '@/features/users/hooks/use-users';
@@ -28,6 +31,7 @@ import {
   socketClientEvents,
   socketServerEvents,
 } from '@/lib/socket/socket-events';
+import type { ProjectMember } from '@/types/project-member';
 import type { Task, TaskStatus } from '@/types/task';
 
 export default function ProjectDetailPage(): React.JSX.Element {
@@ -55,6 +59,8 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const createTaskMutation = useCreateTask(projectId);
   const addTaskAssigneeMutation = useAddTaskAssignee();
   const addProjectMemberMutation = useAddProjectMember();
+  const removeProjectMemberMutation = useRemoveProjectMember();
+  const removeTaskAssigneeMutation = useRemoveTaskAssignee();
   const updateTaskAssigneeStatusMutation = useUpdateTaskAssigneeStatus();
 
   const project = projectQuery.data;
@@ -180,6 +186,26 @@ export default function ProjectDetailPage(): React.JSX.Element {
     setIsAddMemberDialogOpen(false);
   };
 
+  const handleRemoveProjectMember = async (
+    member: ProjectMember,
+  ): Promise<void> => {
+    await removeProjectMemberMutation.mutateAsync({
+      projectId,
+      userId: member.userId,
+    });
+  };
+
+  const handleRemoveTaskAssignee = async (
+    taskId: string,
+    userId: string,
+  ): Promise<void> => {
+    await removeTaskAssigneeMutation.mutateAsync({
+      projectId,
+      taskId,
+      userId,
+    });
+  };
+
   const handleAssignmentStatusChange = async (
     taskId: string,
     userId: string,
@@ -300,11 +326,26 @@ export default function ProjectDetailPage(): React.JSX.Element {
       />
 
       <section className="grid gap-6 lg:grid-cols-3">
-        <ProjectInfoCard
-          project={project}
-          isTeamLead={isTeamLead}
-          memberCount={members.length}
-        />
+        <div className="space-y-6">
+          <ProjectInfoCard
+            project={project}
+            isTeamLead={isTeamLead}
+            memberCount={members.length}
+          />
+
+          {isTeamLead ? (
+            <ProjectMembersCard
+              members={members}
+              canRemoveMembers={isTeamLead}
+              isRemovingMemberId={
+                removeProjectMemberMutation.isPending
+                  ? removeProjectMemberMutation.variables?.userId
+                  : undefined
+              }
+              onRemoveMember={handleRemoveProjectMember}
+            />
+          ) : null}
+        </div>
 
         <ProjectTasksCard
           tasks={tasks}
@@ -319,12 +360,23 @@ export default function ProjectDetailPage(): React.JSX.Element {
               ? updateTaskAssigneeStatusMutation.variables?.userId
               : undefined
           }
+          isRemovingTaskId={
+            removeTaskAssigneeMutation.isPending
+              ? removeTaskAssigneeMutation.variables?.taskId
+              : undefined
+          }
+          isRemovingUserId={
+            removeTaskAssigneeMutation.isPending
+              ? removeTaskAssigneeMutation.variables?.userId
+              : undefined
+          }
           getAssigneeLabel={getAssigneeLabel}
           canUpdateAssigneeStatus={canUpdateAssigneeStatus}
           onAssignmentStatusChange={handleAssignmentStatusChange}
           onAddAssignee={(task) => {
             setSelectedTaskForAssignee(task);
           }}
+          onRemoveAssignee={handleRemoveTaskAssignee}
         />
       </section>
 

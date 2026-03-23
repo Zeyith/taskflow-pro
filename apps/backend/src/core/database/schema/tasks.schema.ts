@@ -16,7 +16,7 @@ export const tasks = pgTable('tasks', {
   projectId: uuid('project_id')
     .notNull()
     .references(() => projects.id),
- 
+
   title: text('title').notNull(),
   description: text('description'),
 

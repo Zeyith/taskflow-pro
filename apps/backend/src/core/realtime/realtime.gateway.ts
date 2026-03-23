@@ -188,12 +188,7 @@ function extractToken(client: AppSocket): string | null {
     return authToken;
   }
 
-  const headersUnknown = client.handshake.headers as unknown;
-
-  const authorizationHeader =
-    typeof headersUnknown === 'object' && headersUnknown !== null
-      ? (headersUnknown as Record<string, unknown>).authorization
-      : undefined;
+  const authorizationHeader = client.handshake.headers.authorization;
 
   return extractBearer(authorizationHeader);
 }

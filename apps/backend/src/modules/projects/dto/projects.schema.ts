@@ -8,6 +8,20 @@ export const createProjectSchema = z
   })
   .strict();
 
+export const updateProjectSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150).optional(),
+    description: z.string().trim().max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (value) => value.name !== undefined || value.description !== undefined,
+    {
+      message: 'At least one field must be provided.',
+      path: ['name'],
+    },
+  );
+
 export const projectListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -35,6 +49,7 @@ export const projectMemberParamsSchema = z
   .strict();
 
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
+export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
 export type ProjectListQueryDto = z.infer<typeof projectListQuerySchema>;
 export type AddProjectMemberDto = z.infer<typeof addProjectMemberSchema>;
 export type ProjectIdParamDto = z.infer<typeof projectIdParamSchema>;
@@ -62,6 +77,12 @@ const projectResponseProperties: NonNullable<SchemaObject['properties']> = {
     type: 'boolean',
     example: false,
   },
+  archivedAt: {
+    type: 'string',
+    format: 'date-time',
+    nullable: true,
+    example: null,
+  },
   createdAt: {
     type: 'string',
     format: 'date-time',
@@ -71,6 +92,12 @@ const projectResponseProperties: NonNullable<SchemaObject['properties']> = {
     type: 'string',
     format: 'date-time',
     example: '2026-03-12T10:00:00.000Z',
+  },
+  deletedAt: {
+    type: 'string',
+    format: 'date-time',
+    nullable: true,
+    example: null,
   },
 };
 
@@ -123,6 +150,25 @@ export const CreateProjectBodySwaggerSchema: SchemaObject = {
       nullable: true,
       example: 'Revision project for login and onboarding flows',
     },
+  },
+};
+
+export const UpdateProjectBodySwaggerSchema: SchemaObject = {
+  type: 'object',
+  properties: {
+    name: {
+      type: 'string',
+      example: 'Mobile App Revision v2',
+    },
+    description: {
+      type: 'string',
+      nullable: true,
+      example: 'Updated project scope and delivery notes',
+    },
+  },
+  example: {
+    name: 'Mobile App Revision v2',
+    description: 'Updated project scope and delivery notes',
   },
 };
 

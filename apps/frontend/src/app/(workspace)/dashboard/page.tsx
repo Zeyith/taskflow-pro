@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   BellRing,
   BriefcaseBusiness,
@@ -44,24 +45,28 @@ export default function DashboardPage(): React.JSX.Element {
       value: summaryQuery.data?.activeProjectsCount ?? '--',
       description: 'Projects currently in execution',
       icon: BriefcaseBusiness,
+      href: '/projects',
     },
     {
       title: 'Open Tasks',
       value: summaryQuery.data?.openTasksCount ?? '--',
       description: 'Pending and in-progress work',
       icon: ListTodo,
+      href: '/tasks',
     },
     {
       title: 'Unread Notifications',
       value: summaryQuery.data?.unreadNotificationsCount ?? '--',
       description: 'Updates waiting for review',
       icon: BellRing,
+      href: '/notifications',
     },
     {
       title: 'Active Incidents',
       value: summaryQuery.data?.activeIncidentsCount ?? '--',
       description: 'Urgent project rooms currently open',
       icon: ShieldAlert,
+      href: '/incidents',
     },
   ] as const;
 
@@ -79,14 +84,19 @@ export default function DashboardPage(): React.JSX.Element {
 
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {statCards.map((card) => (
-          <DashboardStatCard
+          <Link
             key={card.title}
-            title={card.title}
-            value={card.value}
-            description={card.description}
-            icon={card.icon}
-            isLoading={summaryQuery.isLoading}
-          />
+            href={card.href}
+            className="block rounded-[28px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          >
+            <DashboardStatCard
+              title={card.title}
+              value={card.value}
+              description={card.description}
+              icon={card.icon}
+              isLoading={summaryQuery.isLoading}
+            />
+          </Link>
         ))}
       </div>
 

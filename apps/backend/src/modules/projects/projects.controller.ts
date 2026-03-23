@@ -30,11 +30,13 @@ import {
   ProjectMemberListResponseSwaggerSchema,
   ProjectMemberResponseSwaggerSchema,
   ProjectResponseSwaggerSchema,
+  UpdateProjectBodySwaggerSchema,
   addProjectMemberSchema,
   createProjectSchema,
   projectIdParamSchema,
   projectListQuerySchema,
   projectMemberParamsSchema,
+  updateProjectSchema,
 } from './dto/projects.schema';
 import { ProjectsService } from './projects.service';
 
@@ -119,6 +121,37 @@ export class ProjectsController {
     });
   }
 
+  @Patch(':id')
+  @Roles('TEAM_LEAD')
+  @ApiOperation({
+    summary: 'Update project',
+    description:
+      'Updates an active project. Only Team Lead can update projects.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    format: 'uuid',
+    example: '488bffe2-9a1a-48f9-98bd-b3339fa68a22',
+  })
+  @ApiBody({
+    schema: UpdateProjectBodySwaggerSchema,
+  })
+  @ApiOkResponse({
+    description: 'Project updated successfully',
+    schema: ProjectResponseSwaggerSchema,
+  })
+  async updateProject(@Param() params: unknown, @Body() body: unknown) {
+    const { id } = projectIdParamSchema.parse(params);
+    const dto = updateProjectSchema.parse(body);
+
+    return this.projectsService.update({
+      projectId: id,
+      name: dto.name,
+      description: dto.description,
+    });
+  }
+
   @Patch(':id/archive')
   @Roles('TEAM_LEAD')
   @ApiOperation({
@@ -140,6 +173,29 @@ export class ProjectsController {
     const { id } = projectIdParamSchema.parse(params);
 
     return this.projectsService.archive(id);
+  }
+
+  @Delete(':id')
+  @Roles('TEAM_LEAD')
+  @ApiOperation({
+    summary: 'Delete project',
+    description:
+      'Soft deletes an archived project. Only Team Lead can delete projects.',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    format: 'uuid',
+    example: '488bffe2-9a1a-48f9-98bd-b3339fa68a22',
+  })
+  @ApiOkResponse({
+    description: 'Project deleted successfully',
+    schema: ProjectResponseSwaggerSchema,
+  })
+  async deleteProject(@Param() params: unknown) {
+    const { id } = projectIdParamSchema.parse(params);
+
+    return this.projectsService.softDelete(id);
   }
 
   @Post(':id/members')

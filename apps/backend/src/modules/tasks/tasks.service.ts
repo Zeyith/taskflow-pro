@@ -271,19 +271,36 @@ export class TasksService {
       throw new BusinessRuleError('User must be a project member');
     }
 
-    const existingAssignee =
+    const existingActiveAssignee =
       await this.taskAssigneeRepository.findByTaskIdAndUserId(taskId, userId);
 
-    if (existingAssignee) {
+    if (existingActiveAssignee) {
       throw new BusinessRuleError('User is already assigned to this task');
     }
 
-    await this.taskAssigneeRepository.create({
-      taskId,
-      userId,
-      addedBy: actor.sub,
-      status: 'PENDING',
-    });
+    const existingAnyAssignee =
+      await this.taskAssigneeRepository.findAnyByTaskIdAndUserId(
+        taskId,
+        userId,
+      );
+
+    if (existingAnyAssignee) {
+      await this.taskAssigneeRepository.restoreByTaskIdAndUserId(
+        taskId,
+        userId,
+        {
+          addedBy: actor.sub,
+          status: 'PENDING',
+        },
+      );
+    } else {
+      await this.taskAssigneeRepository.create({
+        taskId,
+        userId,
+        addedBy: actor.sub,
+        status: 'PENDING',
+      });
+    }
 
     await this.cacheService.del(CacheKey.projectTasks(task.projectId));
 

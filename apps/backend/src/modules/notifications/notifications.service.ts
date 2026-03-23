@@ -104,7 +104,11 @@ export class NotificationsService {
     offset: number,
   ): Promise<ListNotificationsResult> {
     const [items, total] = await Promise.all([
-      this.notificationRepository.findByRecipientUserId(actor.sub, limit, offset),
+      this.notificationRepository.findByRecipientUserId(
+        actor.sub,
+        limit,
+        offset,
+      ),
       this.notificationRepository.countByRecipientUserId(actor.sub),
     ]);
 

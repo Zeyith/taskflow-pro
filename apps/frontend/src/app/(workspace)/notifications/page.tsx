@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { isAxiosError } from 'axios';
 import { BellRing, RefreshCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -59,7 +59,7 @@ function getNotificationActorLabel(notification: Notification): string {
   return 'Someone';
 }
 
-export default function NotificationsPage(): React.JSX.Element {
+export default function NotificationsPage(): JSX.Element {
   const [offset, setOffset] = useState(0);
   const limit = PAGE_SIZE;
 
@@ -68,6 +68,23 @@ export default function NotificationsPage(): React.JSX.Element {
   const markAsReadMutation = useMarkNotificationAsRead();
   const markAllAsReadMutation = useMarkAllNotificationsAsRead();
   const deleteNotificationMutation = useDeleteNotification();
+
+  const notifications = notificationsQuery.data?.data ?? [];
+  const unreadCount = unreadCountQuery.data?.count ?? 0;
+  const total = notificationsQuery.data?.meta?.total ?? 0;
+
+  useEffect(() => {
+    if (notificationsQuery.isLoading || notificationsQuery.data === undefined) {
+      return;
+    }
+
+    const lastValidOffset =
+      total > 0 ? Math.floor((total - 1) / limit) * limit : 0;
+
+    if (offset > lastValidOffset) {
+      setOffset(lastValidOffset);
+    }
+  }, [limit, notificationsQuery.data, notificationsQuery.isLoading, offset, total]);
 
   async function handleMarkAsRead(notificationId: string): Promise<void> {
     try {
@@ -170,8 +187,6 @@ export default function NotificationsPage(): React.JSX.Element {
     );
   }
 
-  const notifications = notificationsQuery.data?.data ?? [];
-  const unreadCount = unreadCountQuery.data?.count ?? 0;
   const hasUnreadNotifications = unreadCount > 0;
   const isRefreshing =
     notificationsQuery.isFetching || unreadCountQuery.isFetching;
@@ -179,7 +194,6 @@ export default function NotificationsPage(): React.JSX.Element {
     markAsReadMutation.isPending ||
     markAllAsReadMutation.isPending ||
     deleteNotificationMutation.isPending;
-  const total = notificationsQuery.data?.meta?.total ?? 0;
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
   const hasPreviousPage = offset > 0;
