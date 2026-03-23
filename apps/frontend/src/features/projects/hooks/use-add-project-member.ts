@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { addProjectMemberRequest } from '@/features/projects/api/add-project-member';
 
 type AddProjectMemberInput = {
@@ -18,7 +19,7 @@ export function useAddProjectMember() {
       addProjectMemberRequest(input.projectId, input.userId),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({
-        queryKey: ['project', variables.projectId, 'members'],
+        queryKey: queryKeys.projects.members(variables.projectId),
       });
 
       toast.success('Project member added successfully.');

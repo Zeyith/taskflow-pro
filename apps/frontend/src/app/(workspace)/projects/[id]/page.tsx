@@ -2,21 +2,27 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { AddProjectMemberDialog } from '@/features/projects/components/add-project-member-dialog';
+import { EditProjectDialog } from '@/features/projects/components/edit-project-dialog';
 import { ProjectDetailHeader } from '@/features/projects/components/project-detail-header';
 import { ProjectInfoCard } from '@/features/projects/components/project-info-card';
 import { ProjectMembersCard } from '@/features/projects/components/project-members-card';
 import { useAddProjectMember } from '@/features/projects/hooks/use-add-project-member';
+import { useArchiveProject } from '@/features/projects/hooks/use-archive-project';
+import { useDeleteProject } from '@/features/projects/hooks/use-delete-project';
 import { useProjectById } from '@/features/projects/hooks/use-project-by-id';
 import { useProjectMembers } from '@/features/projects/hooks/use-project-members';
 import { useProjectTasks } from '@/features/projects/hooks/use-project-tasks';
 import { useRemoveProjectMember } from '@/features/projects/hooks/use-remove-project-member';
+import { useUpdateProject } from '@/features/projects/hooks/use-update-project';
+import type { UpdateProjectFormValues } from '@/features/projects/schemas/update-project.schema';
 import { AddTaskAssigneeDialog } from '@/features/tasks/components/add-task-assignee-dialog';
 import { CreateTaskDialog } from '@/features/tasks/components/create-task-dialog';
 import { ProjectTasksCard } from '@/features/tasks/components/project-tasks-card';
@@ -36,6 +42,7 @@ import type { Task, TaskStatus } from '@/types/task';
 
 export default function ProjectDetailPage(): React.JSX.Element {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const projectId = params.id;
   const queryClient = useQueryClient();
 
@@ -44,6 +51,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
 
   const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
+  const [isEditProjectDialogOpen, setIsEditProjectDialogOpen] = useState(false);
   const [selectedTaskForAssignee, setSelectedTaskForAssignee] =
     useState<Task | null>(null);
 
@@ -62,6 +70,9 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const removeProjectMemberMutation = useRemoveProjectMember();
   const removeTaskAssigneeMutation = useRemoveTaskAssignee();
   const updateTaskAssigneeStatusMutation = useUpdateTaskAssigneeStatus();
+  const updateProjectMutation = useUpdateProject();
+  const archiveProjectMutation = useArchiveProject();
+  const deleteProjectMutation = useDeleteProject();
 
   const project = projectQuery.data;
   const tasks = tasksQuery.data ?? [];
@@ -112,7 +123,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
       }
 
       void queryClient.invalidateQueries({
-        queryKey: ['project', projectId, 'tasks'],
+        queryKey: queryKeys.projects.tasks(projectId),
       });
     };
 
@@ -158,6 +169,26 @@ export default function ProjectDetailPage(): React.JSX.Element {
     try {
       await createTaskMutation.mutateAsync(values);
       setIsCreateTaskDialogOpen(false);
+    } catch {
+      // Error toast is already handled in mutation.
+    }
+  };
+
+  const handleEditProject = async (
+    values: UpdateProjectFormValues,
+  ): Promise<void> => {
+    if (!project) {
+      return;
+    }
+
+    try {
+      await updateProjectMutation.mutateAsync({
+        projectId: project.id,
+        name: values.name,
+        description: values.description?.trim() ? values.description.trim() : null,
+      });
+
+      setIsEditProjectDialogOpen(false);
     } catch {
       // Error toast is already handled in mutation.
     }
@@ -217,6 +248,52 @@ export default function ProjectDetailPage(): React.JSX.Element {
       userId,
       status,
     });
+  };
+
+  const handleArchiveProject = async (): Promise<void> => {
+    if (!project) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Are you sure you want to archive this project?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await archiveProjectMutation.mutateAsync(project.id);
+    } catch {
+      // Error toast is already handled in mutation.
+    }
+  };
+
+  const handleDeleteProject = async (): Promise<void> => {
+    if (!project) {
+      return;
+    }
+
+    if (!project.isArchived) {
+      toast.error('Only archived projects can be deleted.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'This will permanently delete the archived project. Are you sure?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteProjectMutation.mutateAsync(project.id);
+      router.push('/projects');
+    } catch {
+      // Error toast is already handled in mutation.
+    }
   };
 
   const getAssigneeLabel = (assigneeUserId: string): string => {
@@ -323,6 +400,13 @@ export default function ProjectDetailPage(): React.JSX.Element {
         onCreateTask={() => {
           setIsCreateTaskDialogOpen(true);
         }}
+        onEditProject={() => {
+          setIsEditProjectDialogOpen(true);
+        }}
+        onArchiveProject={handleArchiveProject}
+        onDeleteProject={handleDeleteProject}
+        isArchiving={archiveProjectMutation.isPending}
+        isDeleting={deleteProjectMutation.isPending}
       />
 
       <section className="grid gap-6 lg:grid-cols-3">
@@ -386,6 +470,16 @@ export default function ProjectDetailPage(): React.JSX.Element {
         onSubmit={handleCreateTask}
         isSubmitting={createTaskMutation.isPending}
       />
+
+      {project ? (
+        <EditProjectDialog
+          open={isEditProjectDialogOpen}
+          onOpenChange={setIsEditProjectDialogOpen}
+          project={project}
+          onSubmit={handleEditProject}
+          isSubmitting={updateProjectMutation.isPending}
+        />
+      ) : null}
 
       <AddProjectMemberDialog
         open={isAddMemberDialogOpen}
