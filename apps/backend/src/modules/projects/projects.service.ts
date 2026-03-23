@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { AuthorizationError } from '../../common/exceptions/authorization.exception';
 import { BusinessRuleError } from '../../common/exceptions/business-rule.exception';
 import { NotFoundError } from '../../common/exceptions/not-found.exception';
 import type { UserRole } from '../../common/types/user-role.type';
@@ -268,11 +269,25 @@ export class ProjectsService {
     return this.toProjectMemberResponse(deletedMembership);
   }
 
-  async listMembers(projectId: string) {
+  async listMembers(projectId: string, actor: RequestUserContext) {
     const project = await this.projectRepository.findById(projectId);
 
     if (!project) {
       throw new NotFoundError('Project not found');
+    }
+
+    if (actor.role === 'EMPLOYEE') {
+      const membership =
+        await this.projectMemberRepository.findActiveMembership(
+          projectId,
+          actor.userId,
+        );
+
+      if (!membership) {
+        throw new AuthorizationError(
+          'You do not have permission to access this resource',
+        );
+      }
     }
 
     const members =

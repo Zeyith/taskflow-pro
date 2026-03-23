@@ -1,44 +1,44 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
-import { queryKeys } from '@/constants/query-keys';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { AddProjectMemberDialog } from '@/features/projects/components/add-project-member-dialog';
-import { EditProjectDialog } from '@/features/projects/components/edit-project-dialog';
-import { ProjectDetailHeader } from '@/features/projects/components/project-detail-header';
-import { ProjectInfoCard } from '@/features/projects/components/project-info-card';
-import { ProjectMembersCard } from '@/features/projects/components/project-members-card';
-import { useAddProjectMember } from '@/features/projects/hooks/use-add-project-member';
-import { useArchiveProject } from '@/features/projects/hooks/use-archive-project';
-import { useDeleteProject } from '@/features/projects/hooks/use-delete-project';
-import { useProjectById } from '@/features/projects/hooks/use-project-by-id';
-import { useProjectMembers } from '@/features/projects/hooks/use-project-members';
-import { useProjectTasks } from '@/features/projects/hooks/use-project-tasks';
-import { useRemoveProjectMember } from '@/features/projects/hooks/use-remove-project-member';
-import { useUpdateProject } from '@/features/projects/hooks/use-update-project';
-import type { UpdateProjectFormValues } from '@/features/projects/schemas/update-project.schema';
-import { AddTaskAssigneeDialog } from '@/features/tasks/components/add-task-assignee-dialog';
-import { CreateTaskDialog } from '@/features/tasks/components/create-task-dialog';
-import { ProjectTasksCard } from '@/features/tasks/components/project-tasks-card';
-import { useAddTaskAssignee } from '@/features/tasks/hooks/use-add-task-assignee';
-import { useCreateTask } from '@/features/tasks/hooks/use-create-task';
-import { useRemoveTaskAssignee } from '@/features/tasks/hooks/use-remove-task-assignee';
-import { useUpdateTaskAssigneeStatus } from '@/features/tasks/hooks/use-update-task-assignee-status';
-import type { CreateTaskFormValues } from '@/features/tasks/schema/create-task.schema';
-import { useUsers } from '@/features/users/hooks/use-users';
-import { getSocket } from '@/lib/socket/socket-client';
+import { queryKeys } from "@/constants/query-keys";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { AddProjectMemberDialog } from "@/features/projects/components/add-project-member-dialog";
+import { EditProjectDialog } from "@/features/projects/components/edit-project-dialog";
+import { ProjectDetailHeader } from "@/features/projects/components/project-detail-header";
+import { ProjectInfoCard } from "@/features/projects/components/project-info-card";
+import { ProjectMembersCard } from "@/features/projects/components/project-members-card";
+import { useAddProjectMember } from "@/features/projects/hooks/use-add-project-member";
+import { useArchiveProject } from "@/features/projects/hooks/use-archive-project";
+import { useDeleteProject } from "@/features/projects/hooks/use-delete-project";
+import { useProjectById } from "@/features/projects/hooks/use-project-by-id";
+import { useProjectMembers } from "@/features/projects/hooks/use-project-members";
+import { useProjectTasks } from "@/features/projects/hooks/use-project-tasks";
+import { useRemoveProjectMember } from "@/features/projects/hooks/use-remove-project-member";
+import { useUpdateProject } from "@/features/projects/hooks/use-update-project";
+import type { UpdateProjectFormValues } from "@/features/projects/schemas/update-project.schema";
+import { AddTaskAssigneeDialog } from "@/features/tasks/components/add-task-assignee-dialog";
+import { CreateTaskDialog } from "@/features/tasks/components/create-task-dialog";
+import { ProjectTasksCard } from "@/features/tasks/components/project-tasks-card";
+import { useAddTaskAssignee } from "@/features/tasks/hooks/use-add-task-assignee";
+import { useCreateTask } from "@/features/tasks/hooks/use-create-task";
+import { useRemoveTaskAssignee } from "@/features/tasks/hooks/use-remove-task-assignee";
+import { useUpdateTaskAssigneeStatus } from "@/features/tasks/hooks/use-update-task-assignee-status";
+import type { CreateTaskFormValues } from "@/features/tasks/schema/create-task.schema";
+import { useUsers } from "@/features/users/hooks/use-users";
+import { getSocket } from "@/lib/socket/socket-client";
 import {
   socketClientEvents,
   socketServerEvents,
-} from '@/lib/socket/socket-events';
-import type { ProjectMember } from '@/types/project-member';
-import type { Task, TaskStatus } from '@/types/task';
+} from "@/lib/socket/socket-events";
+import type { ProjectMember } from "@/types/project-member";
+import type { Task, TaskStatus } from "@/types/task";
 
 export default function ProjectDetailPage(): React.JSX.Element {
   const params = useParams<{ id: string }>();
@@ -47,7 +47,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const queryClient = useQueryClient();
 
   const { user, accessToken, isAuthenticated } = useAuth();
-  const isTeamLead = user?.role === 'TEAM_LEAD';
+  const isTeamLead = user?.role === "TEAM_LEAD";
 
   const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
@@ -58,7 +58,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
   const projectQuery = useProjectById(projectId);
   const tasksQuery = useProjectTasks(projectId);
   const membersQuery = useProjectMembers(projectId, {
-    enabled: isTeamLead,
+    enabled: isAuthenticated && projectId.length > 0,
   });
   const usersQuery = useUsers({
     enabled: isTeamLead,
@@ -127,7 +127,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
       });
     };
 
-    socket.on('connect', handleConnect);
+    socket.on("connect", handleConnect);
     socket.on(
       socketServerEvents.taskAssignmentStatusChanged,
       handleTaskAssignmentStatusChanged,
@@ -140,7 +140,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
     }
 
     return () => {
-      socket.off('connect', handleConnect);
+      socket.off("connect", handleConnect);
       socket.off(
         socketServerEvents.taskAssignmentStatusChanged,
         handleTaskAssignmentStatusChanged,
@@ -162,7 +162,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
     }
 
     if (project.isArchived) {
-      toast.error('You cannot create tasks in an archived project.');
+      toast.error("You cannot create tasks in an archived project.");
       return;
     }
 
@@ -185,7 +185,9 @@ export default function ProjectDetailPage(): React.JSX.Element {
       await updateProjectMutation.mutateAsync({
         projectId: project.id,
         name: values.name,
-        description: values.description?.trim() ? values.description.trim() : null,
+        description: values.description?.trim()
+          ? values.description.trim()
+          : null,
       });
 
       setIsEditProjectDialogOpen(false);
@@ -256,7 +258,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
     }
 
     const confirmed = window.confirm(
-      'Are you sure you want to archive this project?',
+      "Are you sure you want to archive this project?",
     );
 
     if (!confirmed) {
@@ -276,12 +278,12 @@ export default function ProjectDetailPage(): React.JSX.Element {
     }
 
     if (!project.isArchived) {
-      toast.error('Only archived projects can be deleted.');
+      toast.error("Only archived projects can be deleted.");
       return;
     }
 
     const confirmed = window.confirm(
-      'This will permanently delete the archived project. Are you sure?',
+      "This will permanently delete the archived project. Are you sure?",
     );
 
     if (!confirmed) {
@@ -290,7 +292,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
 
     try {
       await deleteProjectMutation.mutateAsync(project.id);
-      router.push('/projects');
+      router.push("/projects");
     } catch {
       // Error toast is already handled in mutation.
     }
@@ -298,7 +300,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
 
   const getAssigneeLabel = (assigneeUserId: string): string => {
     if (assigneeUserId === user?.id) {
-      return 'You';
+      return "You";
     }
 
     const memberName = memberNameMap.get(assigneeUserId);
@@ -325,7 +327,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
   if (
     projectQuery.isLoading ||
     tasksQuery.isLoading ||
-    (isTeamLead && membersQuery.isLoading) ||
+    membersQuery.isLoading ||
     (isTeamLead && usersQuery.isLoading)
   ) {
     return (
@@ -355,7 +357,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
     );
   }
 
-  if (isTeamLead && membersQuery.isError) {
+  if (membersQuery.isError) {
     return (
       <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-6 text-sm text-destructive">
         Failed to load project members.
@@ -499,13 +501,13 @@ export default function ProjectDetailPage(): React.JSX.Element {
         }}
         task={
           selectedTaskForAssignee ?? {
-            id: '',
+            id: "",
             projectId,
-            title: '',
+            title: "",
             description: null,
-            status: 'PENDING',
-            createdAt: '',
-            updatedAt: '',
+            status: "PENDING",
+            createdAt: "",
+            updatedAt: "",
             assignees: [],
           }
         }

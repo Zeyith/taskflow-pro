@@ -265,11 +265,10 @@ export class ProjectsController {
   }
 
   @Get(':id/members')
-  @Roles('TEAM_LEAD')
   @ApiOperation({
     summary: 'List project members',
     description:
-      'Returns active project members. Only Team Lead can list members.',
+      'Returns active project members. Team Lead can always access. Employee can access only if they are an active member of the project.',
   })
   @ApiParam({
     name: 'id',
@@ -281,9 +280,15 @@ export class ProjectsController {
     description: 'Project members returned successfully',
     schema: ProjectMemberListResponseSwaggerSchema,
   })
-  async getProjectMembers(@Param() params: unknown) {
+  async getProjectMembers(
+    @Param() params: unknown,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const { id } = projectIdParamSchema.parse(params);
 
-    return this.projectsService.listMembers(id);
+    return this.projectsService.listMembers(id, {
+      userId: user.sub,
+      role: user.role,
+    });
   }
 }
