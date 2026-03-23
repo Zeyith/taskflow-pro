@@ -13,7 +13,10 @@ import {
   PROJECT_REPOSITORY,
   type IProjectRepository,
 } from '../projects/repositories/interfaces/project.repository.interface';
-import type { CreateIncidentDto } from './dto/incidents-validation.schema';
+import type {
+  AccessibleIncidentListQueryDto,
+  CreateIncidentDto,
+} from './dto/incidents-validation.schema';
 import { IncidentCreatedEvent } from './events/incident-created.event';
 import { IncidentResolvedEvent } from './events/incident-resolved.event';
 import {
@@ -82,6 +85,102 @@ export class IncidentsService {
       data: incidentResponse,
       meta: {
         isCached: false,
+      },
+    };
+  }
+
+  async listAccessibleIncidents(
+    query: AccessibleIncidentListQueryDto,
+    currentUser: AuthenticatedUser,
+  ): Promise<{
+    data: IncidentResponse[];
+    meta: {
+      isCached: boolean;
+      limit: number;
+      offset: number;
+      total: number;
+    };
+  }> {
+    const { projectId, severity, status, limit, offset } = query;
+
+    if (currentUser.role === 'TEAM_LEAD') {
+      if (projectId) {
+        await this.ensureProjectExists(projectId);
+      }
+
+      const result = await this.incidentRoomRepository.findMany({
+        projectIds: projectId ? [projectId] : undefined,
+        severity,
+        status,
+        limit,
+        offset,
+      });
+
+      return {
+        data: result.items.map(toIncidentResponse),
+        meta: {
+          isCached: false,
+          limit,
+          offset,
+          total: result.total,
+        },
+      };
+    }
+
+    if (projectId) {
+      await this.ensureProjectAccess(projectId, currentUser);
+
+      const result = await this.incidentRoomRepository.findMany({
+        projectIds: [projectId],
+        severity,
+        status,
+        limit,
+        offset,
+      });
+
+      return {
+        data: result.items.map(toIncidentResponse),
+        meta: {
+          isCached: false,
+          limit,
+          offset,
+          total: result.total,
+        },
+      };
+    }
+
+    const accessibleProjectIds =
+      await this.projectMemberRepository.findActiveProjectIdsByUserId(
+        currentUser.sub,
+      );
+
+    if (accessibleProjectIds.length === 0) {
+      return {
+        data: [],
+        meta: {
+          isCached: false,
+          limit,
+          offset,
+          total: 0,
+        },
+      };
+    }
+
+    const result = await this.incidentRoomRepository.findMany({
+      projectIds: accessibleProjectIds,
+      severity,
+      status,
+      limit,
+      offset,
+    });
+
+    return {
+      data: result.items.map(toIncidentResponse),
+      meta: {
+        isCached: false,
+        limit,
+        offset,
+        total: result.total,
       },
     };
   }

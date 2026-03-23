@@ -1,5 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 
 import { DATABASE_CONNECTION } from '../../../core/database/database.module';
 import type { AppDb } from '../../../core/database/database.types';
@@ -9,7 +17,11 @@ import {
   type NewIncidentRoomRow,
 } from '../../../core/database/schema';
 import { IncidentRoom } from '../entities/incident-room.entity';
-import { type IIncidentRoomRepository } from './interfaces/incident-room.repository.interface';
+import {
+  type FindIncidentRoomsFilters,
+  type FindIncidentRoomsResult,
+  type IIncidentRoomRepository,
+} from './interfaces/incident-room.repository.interface';
 
 @Injectable()
 export class IncidentRoomRepository implements IIncidentRoomRepository {
@@ -58,6 +70,46 @@ export class IncidentRoomRepository implements IIncidentRoomRepository {
       .orderBy(desc(incidentRooms.createdAt));
 
     return rows.map((row) => this.toDomain(row));
+  }
+
+  async findMany(
+    filters: FindIncidentRoomsFilters,
+  ): Promise<FindIncidentRoomsResult> {
+    const conditions: SQL<unknown>[] = [isNull(incidentRooms.deletedAt)];
+
+    if (filters.projectIds && filters.projectIds.length > 0) {
+      conditions.push(inArray(incidentRooms.projectId, filters.projectIds));
+    }
+
+    if (filters.severity) {
+      conditions.push(eq(incidentRooms.severity, filters.severity));
+    }
+
+    if (filters.status) {
+      conditions.push(eq(incidentRooms.status, filters.status));
+    }
+
+    const whereClause = and(...conditions);
+
+    const rows = await this.db
+      .select()
+      .from(incidentRooms)
+      .where(whereClause)
+      .orderBy(desc(incidentRooms.createdAt))
+      .limit(filters.limit)
+      .offset(filters.offset);
+
+    const totalRows = await this.db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(incidentRooms)
+      .where(whereClause);
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total: totalRows[0]?.count ?? 0,
+    };
   }
 
   async close(id: string, closedAt: Date): Promise<IncidentRoom | null> {

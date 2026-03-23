@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -12,6 +13,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user.type';
 import {
+  accessibleIncidentListQuerySchema,
   createIncidentSchema,
   incidentIdParamSchema,
   projectIncidentListParamSchema,
@@ -31,6 +33,19 @@ export class IncidentsController {
     const parsedBody = createIncidentSchema.parse(body);
 
     return this.incidentsService.createIncident(parsedBody, currentUser);
+  }
+
+  @Get('incidents')
+  async listAccessibleIncidents(
+    @Query() query: unknown,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const parsedQuery = accessibleIncidentListQuerySchema.parse(query);
+
+    return this.incidentsService.listAccessibleIncidents(
+      parsedQuery,
+      currentUser,
+    );
   }
 
   @Get('projects/:projectId/incidents')

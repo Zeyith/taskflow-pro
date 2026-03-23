@@ -21,5 +21,6 @@ export interface IProjectMemberRepository {
     limit: number,
     offset: number,
   ): Promise<Project[]>;
+  findActiveProjectIdsByUserId(userId: string): Promise<string[]>;
   softDelete(projectId: string, userId: string): Promise<ProjectMember | null>;
 }

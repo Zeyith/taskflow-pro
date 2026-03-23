@@ -38,6 +38,7 @@ export const apiEndpoints = {
   },
 
   incidents: {
+    list: '/incidents',
     create: '/incidents',
     detail: (incidentId: string) => `/incidents/${incidentId}`,
     close: (incidentId: string) => `/incidents/${incidentId}/close`,

@@ -149,6 +149,24 @@ export class ProjectMemberRepository implements IProjectMemberRepository {
     return rows.map((row) => this.toProjectDomain(row.project));
   }
 
+  async findActiveProjectIdsByUserId(userId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({
+        projectId: projectMembers.projectId,
+      })
+      .from(projectMembers)
+      .innerJoin(projects, eq(projectMembers.projectId, projects.id))
+      .where(
+        and(
+          eq(projectMembers.userId, userId),
+          isNull(projectMembers.deletedAt),
+          isNull(projects.deletedAt),
+        ),
+      );
+
+    return rows.map((row) => row.projectId);
+  }
+
   async softDelete(
     projectId: string,
     userId: string,
