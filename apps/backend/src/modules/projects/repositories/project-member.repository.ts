@@ -52,9 +52,7 @@ export class ProjectMemberRepository implements IProjectMemberRepository {
         ),
       );
 
-    return rows.map((row) =>
-      this.toDomainWithUser(row.membership, row.user),
-    );
+    return rows.map((row) => this.toDomainWithUser(row.membership, row.user));
   }
 
   async findActiveMembership(

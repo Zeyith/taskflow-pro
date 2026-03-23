@@ -26,11 +26,7 @@ export class TaskNotificationsListener {
       props.projectId,
     );
 
-    const recipients = members.filter(
-      (member) => member.userId !== props.changedBy,
-    );
-
-    if (recipients.length === 0) {
+    if (members.length === 0) {
       return;
     }
 
@@ -38,9 +34,9 @@ export class TaskNotificationsListener {
     const message = `Task status changed from ${props.oldStatus} to ${props.newStatus}.`;
 
     await Promise.all(
-      recipients.map((recipient) =>
+      members.map((member) =>
         this.notificationsService.createNotification({
-          recipientUserId: recipient.userId,
+          recipientUserId: member.userId,
           projectId: props.projectId,
           taskId: props.taskId,
           type: 'TASK_STATUS_CHANGED',

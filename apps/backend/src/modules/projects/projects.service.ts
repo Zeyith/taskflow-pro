@@ -59,6 +59,12 @@ export class ProjectsService {
       createdBy: input.createdBy,
     });
 
+    await this.projectMemberRepository.create({
+      projectId: project.id,
+      userId: input.createdBy,
+      addedBy: input.createdBy,
+    });
+
     return this.toResponse(project);
   }
 
@@ -212,6 +218,13 @@ export class ProjectsService {
     name: string;
     description: string | null;
     createdBy: string;
+    createdByUser: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: UserRole;
+    } | null;
     isArchived: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -221,6 +234,7 @@ export class ProjectsService {
       name: project.name,
       description: project.description,
       createdBy: project.createdBy,
+      createdByUser: project.createdByUser,
       isArchived: project.isArchived,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,

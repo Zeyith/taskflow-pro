@@ -2,11 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { getNotificationsRequest } from '@/features/notifications/api/get-notifications';
+import {
+  getNotificationsRequest,
+  type GetNotificationsRequestParams,
+} from '@/features/notifications/api/get-notifications';
 
-export function useNotifications() {
+export function useNotifications(params: GetNotificationsRequestParams) {
   return useQuery({
-    queryKey: ['notifications', 'list'],
-    queryFn: getNotificationsRequest,
+    queryKey: ['notifications', 'list', params.limit, params.offset],
+    queryFn: () => getNotificationsRequest(params),
   });
 }

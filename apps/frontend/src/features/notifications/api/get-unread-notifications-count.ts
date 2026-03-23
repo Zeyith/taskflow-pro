@@ -5,7 +5,12 @@ import type { UnreadNotificationsCountResponse } from '@/types/notification';
 type RawUnreadCountResponse =
   | UnreadNotificationsCountResponse
   | {
-      data?: UnreadNotificationsCountResponse;
+      data?: {
+        unreadCount?: number;
+      };
+      meta?: {
+        isCached?: boolean;
+      };
     };
 
 function normalizeUnreadCountResponse(
@@ -16,7 +21,7 @@ function normalizeUnreadCountResponse(
   }
 
   return {
-    count: response.data?.count ?? 0,
+    count: response.data?.unreadCount ?? 0,
   };
 }
 

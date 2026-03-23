@@ -17,6 +17,25 @@ import {
   type INotificationRepository,
 } from './repositories/interfaces/notification.repository.interface';
 
+type CreateNotificationInput = {
+  recipientUserId: string;
+  projectId?: string | null;
+  taskId?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  createdBy: string;
+};
+
+type ListNotificationsResult = {
+  items: Notification[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+  };
+};
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -26,15 +45,9 @@ export class NotificationsService {
     private readonly cacheService: CacheService,
   ) {}
 
-  async createNotification(input: {
-    recipientUserId: string;
-    projectId?: string | null;
-    taskId?: string | null;
-    type: string;
-    title: string;
-    message: string;
-    createdBy: string;
-  }): Promise<Notification> {
+  async createNotification(
+    input: CreateNotificationInput,
+  ): Promise<Notification> {
     const notification = await this.notificationRepository.create({
       recipientUserId: input.recipientUserId,
       projectId: input.projectId ?? null,
@@ -44,6 +57,7 @@ export class NotificationsService {
       message: input.message,
       isRead: false,
       createdBy: input.createdBy,
+      readAt: null,
     });
 
     await this.cacheService.del(
@@ -88,12 +102,20 @@ export class NotificationsService {
     actor: AuthenticatedUser,
     limit: number,
     offset: number,
-  ): Promise<Notification[]> {
-    return this.notificationRepository.findByRecipientUserId(
-      actor.sub,
-      limit,
-      offset,
-    );
+  ): Promise<ListNotificationsResult> {
+    const [items, total] = await Promise.all([
+      this.notificationRepository.findByRecipientUserId(actor.sub, limit, offset),
+      this.notificationRepository.countByRecipientUserId(actor.sub),
+    ]);
+
+    return {
+      items,
+      pagination: {
+        limit,
+        offset,
+        total,
+      },
+    };
   }
 
   async getMyUnreadCount(actor: AuthenticatedUser): Promise<{
@@ -183,5 +205,78 @@ export class NotificationsService {
     );
 
     return updated;
+  }
+
+  async markAllAsRead(actor: AuthenticatedUser): Promise<{
+    data: {
+      updatedCount: number;
+    };
+  }> {
+    const updatedCount =
+      await this.notificationRepository.markAllAsReadByRecipientUserId(
+        actor.sub,
+        new Date(),
+      );
+
+    await this.cacheService.del(CacheKey.notificationUnreadCount(actor.sub));
+
+    const unreadCount =
+      await this.notificationRepository.countUnreadByRecipientUserId(actor.sub);
+
+    this.eventEmitter.emit(
+      NotificationUnreadCountUpdatedEvent.eventName,
+      new NotificationUnreadCountUpdatedEvent({
+        recipientUserId: actor.sub,
+        unreadCount,
+      }),
+    );
+
+    return {
+      data: {
+        updatedCount,
+      },
+    };
+  }
+
+  async deleteNotification(
+    actor: AuthenticatedUser,
+    notificationId: string,
+  ): Promise<Notification> {
+    const notification =
+      await this.notificationRepository.findById(notificationId);
+
+    if (!notification) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    if (notification.recipientUserId !== actor.sub) {
+      throw new AuthorizationError(
+        'You are not allowed to delete this notification',
+      );
+    }
+
+    const deleted = await this.notificationRepository.softDeleteById(
+      notificationId,
+      actor.sub,
+    );
+
+    if (!deleted) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    await this.cacheService.del(CacheKey.notificationUnreadCount(actor.sub));
+
+    const unreadCount =
+      await this.notificationRepository.countUnreadByRecipientUserId(actor.sub);
+
+    this.eventEmitter.emit(
+      NotificationUnreadCountUpdatedEvent.eventName,
+      new NotificationUnreadCountUpdatedEvent({
+        recipientUserId: actor.sub,
+        unreadCount,
+      }),
+    );
+
+    return deleted;
   }
 }

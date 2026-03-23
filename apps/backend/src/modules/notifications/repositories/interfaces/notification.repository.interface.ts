@@ -15,9 +15,18 @@ export interface INotificationRepository {
     limit: number,
     offset: number,
   ): Promise<Notification[]>;
+  countByRecipientUserId(recipientUserId: string): Promise<number>;
   updateById(
     id: string,
     payload: UpdateNotificationPayload,
+  ): Promise<Notification | null>;
+  markAllAsReadByRecipientUserId(
+    recipientUserId: string,
+    readAt: Date,
+  ): Promise<number>;
+  softDeleteById(
+    id: string,
+    recipientUserId: string,
   ): Promise<Notification | null>;
   countUnreadByRecipientUserId(recipientUserId: string): Promise<number>;
 }

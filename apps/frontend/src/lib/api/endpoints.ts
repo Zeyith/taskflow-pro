@@ -33,6 +33,8 @@ export const apiEndpoints = {
     unreadCount: '/notifications/unread-count',
     markRead: (notificationId: string) =>
       `/notifications/${notificationId}/read`,
+    markAllRead: '/notifications/read-all',
+    delete: (notificationId: string) => `/notifications/${notificationId}`,
   },
 
   incidents: {

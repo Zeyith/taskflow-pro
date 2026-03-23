@@ -1,12 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { DATABASE_CONNECTION } from '../../../core/database/database.module';
 import type { AppDb } from '../../../core/database/database.types';
 import {
   projects,
+  users,
   type NewProjectRow,
   type ProjectRow,
+  type UserRow,
 } from '../../../core/database/schema';
 import { Project } from '../entities/project.entity';
 import { type IProjectRepository } from './interfaces/project.repository.interface';
@@ -28,32 +30,59 @@ export class ProjectRepository implements IProjectRepository {
       throw new Error('Project creation failed');
     }
 
-    return this.toDomain(createdRow);
+    const [projectWithCreator] = await this.db
+      .select({
+        project: projects,
+        creator: users,
+      })
+      .from(projects)
+      .leftJoin(users, eq(projects.createdBy, users.id))
+      .where(and(eq(projects.id, createdRow.id), isNull(projects.deletedAt)))
+      .limit(1);
+
+    if (!projectWithCreator) {
+      return this.toDomain(createdRow);
+    }
+
+    return this.toDomainWithCreator(
+      projectWithCreator.project,
+      projectWithCreator.creator,
+    );
   }
 
   async findById(id: string): Promise<Project | null> {
     const [row] = await this.db
-      .select()
+      .select({
+        project: projects,
+        creator: users,
+      })
       .from(projects)
-      .where(eq(projects.id, id))
+      .leftJoin(users, eq(projects.createdBy, users.id))
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
       .limit(1);
 
-    if (!row || row.deletedAt !== null) {
+    if (!row) {
       return null;
     }
 
-    return this.toDomain(row);
+    return this.toDomainWithCreator(row.project, row.creator);
   }
 
   async findAll(limit: number, offset: number): Promise<Project[]> {
     const rows = await this.db
-      .select()
+      .select({
+        project: projects,
+        creator: users,
+      })
       .from(projects)
+      .leftJoin(users, eq(projects.createdBy, users.id))
       .where(isNull(projects.deletedAt))
       .limit(limit)
       .offset(offset);
 
-    return rows.map((row) => this.toDomain(row));
+    return rows.map((row) =>
+      this.toDomainWithCreator(row.project, row.creator),
+    );
   }
 
   async archive(id: string): Promise<Project | null> {
@@ -63,14 +92,31 @@ export class ProjectRepository implements IProjectRepository {
         isArchived: true,
         updatedAt: new Date(),
       })
-      .where(eq(projects.id, id))
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
       .returning();
 
-    if (!updatedRow || updatedRow.deletedAt !== null) {
+    if (!updatedRow) {
       return null;
     }
 
-    return this.toDomain(updatedRow);
+    const [projectWithCreator] = await this.db
+      .select({
+        project: projects,
+        creator: users,
+      })
+      .from(projects)
+      .leftJoin(users, eq(projects.createdBy, users.id))
+      .where(and(eq(projects.id, updatedRow.id), isNull(projects.deletedAt)))
+      .limit(1);
+
+    if (!projectWithCreator) {
+      return this.toDomain(updatedRow);
+    }
+
+    return this.toDomainWithCreator(
+      projectWithCreator.project,
+      projectWithCreator.creator,
+    );
   }
 
   private toDomain(row: ProjectRow): Project {
@@ -79,10 +125,36 @@ export class ProjectRepository implements IProjectRepository {
       name: row.name,
       description: row.description ?? null,
       createdBy: row.createdBy,
+      createdByUser: null,
       isArchived: row.isArchived,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       deletedAt: row.deletedAt ?? null,
+    });
+  }
+
+  private toDomainWithCreator(
+    projectRow: ProjectRow,
+    creatorRow: UserRow | null,
+  ): Project {
+    return new Project({
+      id: projectRow.id,
+      name: projectRow.name,
+      description: projectRow.description ?? null,
+      createdBy: projectRow.createdBy,
+      createdByUser: creatorRow
+        ? {
+            id: creatorRow.id,
+            firstName: creatorRow.firstName,
+            lastName: creatorRow.lastName,
+            email: creatorRow.email,
+            role: creatorRow.role,
+          }
+        : null,
+      isArchived: projectRow.isArchived,
+      createdAt: projectRow.createdAt,
+      updatedAt: projectRow.updatedAt,
+      deletedAt: projectRow.deletedAt ?? null,
     });
   }
 }

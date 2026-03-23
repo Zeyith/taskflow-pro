@@ -6,6 +6,14 @@ export type NotificationType =
   | 'INCIDENT_RESOLVED'
   | string;
 
+export type NotificationActorUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+};
+
 export type Notification = {
   id: string;
   type: NotificationType;
@@ -14,8 +22,13 @@ export type Notification = {
   isRead: boolean;
   createdAt: string;
   projectId?: string | null;
+  projectName?: string | null;
   taskId?: string | null;
   incidentId?: string | null;
+  createdBy?: string;
+  createdByUser?: NotificationActorUser | null;
+  readAt?: string | null;
+  updatedAt?: string;
 };
 
 export type NotificationsMeta = {

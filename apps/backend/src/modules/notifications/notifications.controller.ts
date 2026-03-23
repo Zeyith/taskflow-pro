@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -44,18 +45,15 @@ export class NotificationsController {
   ) {
     const parsedQuery = notificationListQuerySchema.parse(query);
 
-    const notifications = await this.notificationsService.listMyNotifications(
+    const result = await this.notificationsService.listMyNotifications(
       user,
       parsedQuery.limit,
       parsedQuery.offset,
     );
 
     return {
-      items: notifications.map((item) => toNotificationResponse(item)),
-      pagination: {
-        limit: parsedQuery.limit,
-        offset: parsedQuery.offset,
-      },
+      items: result.items.map((item) => toNotificationResponse(item)),
+      pagination: result.pagination,
     };
   }
 
@@ -70,6 +68,18 @@ export class NotificationsController {
   })
   async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.getMyUnreadCount(user);
+  }
+
+  @Patch('read-all')
+  @ApiOperation({
+    summary: 'Mark all notifications as read',
+    description: 'Marks all notifications as read for the authenticated user.',
+  })
+  @ApiOkResponse({
+    description: 'All notifications marked as read successfully',
+  })
+  async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.markAllAsRead(user);
   }
 
   @Patch(':id/read')
@@ -87,6 +97,28 @@ export class NotificationsController {
     const parsedParams = notificationIdParamSchema.parse(params);
 
     const notification = await this.notificationsService.markAsRead(
+      user,
+      parsedParams.id,
+    );
+
+    return toNotificationResponse(notification);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete notification',
+    description: 'Soft deletes a notification for the authenticated user.',
+  })
+  @ApiOkResponse({
+    description: 'Notification deleted successfully',
+  })
+  async deleteNotification(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param() params: unknown,
+  ) {
+    const parsedParams = notificationIdParamSchema.parse(params);
+
+    const notification = await this.notificationsService.deleteNotification(
       user,
       parsedParams.id,
     );

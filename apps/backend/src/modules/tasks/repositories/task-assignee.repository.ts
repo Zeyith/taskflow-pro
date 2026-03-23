@@ -92,10 +92,7 @@ export class TaskAssigneeRepository implements ITaskAssigneeRepository {
       .select()
       .from(taskAssignees)
       .where(
-        and(
-          eq(taskAssignees.taskId, taskId),
-          eq(taskAssignees.userId, userId),
-        ),
+        and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
       )
       .limit(1);
 
@@ -120,10 +117,7 @@ export class TaskAssigneeRepository implements ITaskAssigneeRepository {
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(taskAssignees.taskId, taskId),
-          eq(taskAssignees.userId, userId),
-        ),
+        and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
       )
       .returning();
 

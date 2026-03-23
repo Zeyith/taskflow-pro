@@ -24,11 +24,7 @@ export class IncidentResolvedNotificationsListener {
       props.projectId,
     );
 
-    const recipients = members.filter(
-      (member) => member.userId !== props.createdBy,
-    );
-
-    if (recipients.length === 0) {
+    if (members.length === 0) {
       return;
     }
 
@@ -36,9 +32,9 @@ export class IncidentResolvedNotificationsListener {
     const message = props.title;
 
     await Promise.all(
-      recipients.map((recipient) =>
+      members.map((member) =>
         this.notificationsService.createNotification({
-          recipientUserId: recipient.userId,
+          recipientUserId: member.userId,
           projectId: props.projectId,
           taskId: null,
           type: 'INCIDENT_RESOLVED',
