@@ -1,14 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
   BellRing,
   BriefcaseBusiness,
   ListTodo,
   ShieldAlert,
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 
+import { queryKeys } from '@/constants/query-keys';
 import { DashboardActivityCard } from '@/features/dashboard/components/dashboard-activity-card';
 import { DashboardHero } from '@/features/dashboard/components/dashboard-hero';
 import { DashboardPresenceCard } from '@/features/dashboard/components/dashboard-presence-card';
@@ -22,7 +23,7 @@ export default function DashboardPage(): React.JSX.Element {
   const summaryQuery = useDashboardSummary();
 
   const projectsQuery = useQuery({
-    queryKey: ['dashboard', 'presence-projects'],
+    queryKey: queryKeys.dashboard.presenceProjects,
     queryFn: getProjectsRequest,
   });
 

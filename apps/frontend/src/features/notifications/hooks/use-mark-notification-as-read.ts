@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { queryKeys } from '@/constants/query-keys';
 import { markNotificationAsReadRequest } from '@/features/notifications/api/mark-notification-as-read';
 
 export function useMarkNotificationAsRead() {
@@ -11,11 +12,15 @@ export function useMarkNotificationAsRead() {
     mutationFn: markNotificationAsReadRequest,
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['notifications', 'list'],
+        queryKey: queryKeys.notifications.all,
       });
 
       void queryClient.invalidateQueries({
-        queryKey: ['notifications', 'unread-count'],
+        queryKey: queryKeys.notifications.unreadCount,
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
       });
     },
   });

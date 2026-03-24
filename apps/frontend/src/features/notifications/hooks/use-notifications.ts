@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { queryKeys } from '@/constants/query-keys';
 import {
   getNotificationsRequest,
   type GetNotificationsRequestParams,
@@ -9,7 +10,7 @@ import {
 
 export function useNotifications(params: GetNotificationsRequestParams) {
   return useQuery({
-    queryKey: ['notifications', 'list', params.limit, params.offset],
+    queryKey: queryKeys.notifications.list(params.limit, params.offset),
     queryFn: () => getNotificationsRequest(params),
   });
 }

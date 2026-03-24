@@ -2,10 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { queryKeys } from '@/constants/query-keys';
 import { getProjectIncidentsRequest } from '@/features/incidents/api/get-project-incidents';
+import { getUnreadNotificationsCountRequest } from '@/features/notifications/api/get-unread-notifications-count';
 import { getProjectTasks } from '@/features/projects/api/get-project-tasks';
 import { getProjectsRequest } from '@/features/projects/api/get-projects';
-import { getUnreadNotificationsCountRequest } from '@/features/notifications/api/get-unread-notifications-count';
 
 type DashboardSummary = {
   activeProjectsCount: number;
@@ -16,7 +17,7 @@ type DashboardSummary = {
 
 export function useDashboardSummary() {
   return useQuery({
-    queryKey: ['dashboard', 'summary'],
+    queryKey: queryKeys.dashboard.summary,
     queryFn: async (): Promise<DashboardSummary> => {
       const [projectsResponse, unreadCountResponse] = await Promise.all([
         getProjectsRequest(),
@@ -38,10 +39,11 @@ export function useDashboardSummary() {
 
       const activeIncidentsCount = incidentsByProject
         .flatMap((response) => response.data)
-        .filter((incident) => incident.status === 'OPEN').length;
+        .filter((incident) => incident.status === 'ACTIVE').length;
 
       return {
-        activeProjectsCount: projects.filter((project) => !project.isArchived).length,
+        activeProjectsCount: projects.filter((project) => !project.isArchived)
+          .length,
         openTasksCount,
         unreadNotificationsCount: unreadCountResponse.count,
         activeIncidentsCount,

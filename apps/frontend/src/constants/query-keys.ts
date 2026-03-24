@@ -20,6 +20,12 @@ export const queryKeys = {
   },
   notifications: {
     all: ['notifications'] as const,
+    list: (limit: number, offset: number) =>
+      ['notifications', 'list', limit, offset] as const,
     unreadCount: ['notifications', 'unread-count'] as const,
+  },
+  dashboard: {
+    summary: ['dashboard', 'summary'] as const,
+    presenceProjects: ['dashboard', 'presence-projects'] as const,
   },
 } as const;

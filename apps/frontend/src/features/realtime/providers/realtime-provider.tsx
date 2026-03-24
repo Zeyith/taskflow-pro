@@ -80,6 +80,10 @@ export function RealtimeProvider({
           queryKey: queryKeys.notifications.unreadCount,
         });
 
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.summary,
+        });
+
         showIncidentToast({
           incident: payload,
           onClick: () => {
@@ -92,6 +96,40 @@ export function RealtimeProvider({
     socket.on(realtimeEvent.incidentResolved, () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.incidents.all,
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
+      });
+    });
+
+    socket.on(realtimeEvent.notificationCreated, () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.all,
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount,
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
+      });
+    });
+
+    socket.on(realtimeEvent.notificationUnreadCountUpdated, () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount,
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
+      });
+    });
+
+    socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
       });
     });
 
