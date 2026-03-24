@@ -19,6 +19,7 @@ import {
   PROJECT_REPOSITORY,
   type IProjectRepository,
 } from '../projects/repositories/interfaces/project.repository.interface';
+import type { UpdateTaskBodyDto } from './dto/task-validation.schema';
 import { Task } from './entities/task.entity';
 import { TaskAssignee } from './entities/task-assignee.entity';
 import { TaskAssignmentStatusChangedEvent } from './events/task-assignment-status-changed.event';
@@ -249,6 +250,81 @@ export class TasksService {
     };
   }
 
+  async updateTask(
+    actor: AuthenticatedUser,
+    taskId: string,
+    input: UpdateTaskBodyDto,
+  ): Promise<TaskDetail> {
+    this.ensureTeamLead(actor.role);
+
+    const task = await this.taskRepository.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    const project = await this.projectRepository.findById(task.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError('Cannot update task for archived project');
+    }
+
+    const updatedTask = await this.taskRepository.updateById(taskId, {
+      title: input.title,
+      description: input.description,
+    });
+
+    if (!updatedTask) {
+      throw new NotFoundError('Task not found');
+    }
+
+    await this.cacheService.del(CacheKey.projectTasks(task.projectId));
+
+    const assignees = await this.taskAssigneeRepository.findByTaskId(taskId);
+    const statuses = assignees.map((item) => item.status);
+
+    return {
+      task: updatedTask,
+      assignees,
+      breakdown: buildTaskStatusBreakdown(statuses),
+    };
+  }
+
+  async deleteTask(
+    actor: AuthenticatedUser,
+    taskId: string,
+  ): Promise<void> {
+    this.ensureTeamLead(actor.role);
+
+    const task = await this.taskRepository.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundError('Task not found');
+    }
+
+    const project = await this.projectRepository.findById(task.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError('Cannot delete task for archived project');
+    }
+
+    const deleted = await this.taskRepository.softDeleteById(taskId);
+
+    if (!deleted) {
+      throw new NotFoundError('Task not found');
+    }
+
+    await this.cacheService.del(CacheKey.projectTasks(task.projectId));
+  }
+
   async addAssignee(
     actor: AuthenticatedUser,
     taskId: string,
@@ -260,6 +336,16 @@ export class TasksService {
 
     if (!task) {
       throw new NotFoundError('Task not found');
+    }
+
+    const project = await this.projectRepository.findById(task.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError('Cannot add assignee to task in archived project');
     }
 
     const membership = await this.projectMemberRepository.findActiveMembership(
@@ -320,6 +406,18 @@ export class TasksService {
       throw new NotFoundError('Task not found');
     }
 
+    const project = await this.projectRepository.findById(task.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError(
+        'Cannot remove assignee from task in archived project',
+      );
+    }
+
     const existingAssignee =
       await this.taskAssigneeRepository.findByTaskIdAndUserId(taskId, userId);
 
@@ -347,6 +445,18 @@ export class TasksService {
 
     if (!task) {
       throw new NotFoundError('Task not found');
+    }
+
+    const project = await this.projectRepository.findById(task.projectId);
+
+    if (!project) {
+      throw new NotFoundError('Project not found');
+    }
+
+    if (project.isArchived) {
+      throw new BusinessRuleError(
+        'Cannot update task status for archived project',
+      );
     }
 
     const assignment = await this.taskAssigneeRepository.findByTaskIdAndUserId(

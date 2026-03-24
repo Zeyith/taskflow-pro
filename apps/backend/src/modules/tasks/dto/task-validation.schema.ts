@@ -22,6 +22,16 @@ export const createTaskBodySchema = z
   })
   .strip();
 
+export const updateTaskBodySchema = z
+  .object({
+    title: z.string().trim().min(1).max(200).optional(),
+    description: z.string().trim().min(1).max(2000).nullable().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
 export const addTaskAssigneeBodySchema = z
   .object({
     userId: z.uuid(),
@@ -44,6 +54,7 @@ export type TaskIdParamDto = z.infer<typeof taskIdParamSchema>;
 export type ProjectIdParamDto = z.infer<typeof projectIdParamSchema>;
 export type TaskAssigneeParamsDto = z.infer<typeof taskAssigneeParamsSchema>;
 export type CreateTaskBodyDto = z.infer<typeof createTaskBodySchema>;
+export type UpdateTaskBodyDto = z.infer<typeof updateTaskBodySchema>;
 export type AddTaskAssigneeBodyDto = z.infer<typeof addTaskAssigneeBodySchema>;
 export type UpdateTaskAssignmentStatusBodyDto = z.infer<
   typeof updateTaskAssignmentStatusBodySchema
@@ -76,6 +87,21 @@ export const CreateTaskBodySwaggerSchema = {
     },
   },
   required: ['projectId', 'title', 'assigneeIds'],
+};
+
+export const UpdateTaskBodySwaggerSchema = {
+  type: 'object',
+  properties: {
+    title: {
+      type: 'string',
+      example: 'Updated Login Screen Task',
+    },
+    description: {
+      type: 'string',
+      nullable: true,
+      example: 'Refine copy and validation states before QA',
+    },
+  },
 };
 
 export const AddTaskAssigneeBodySwaggerSchema = {

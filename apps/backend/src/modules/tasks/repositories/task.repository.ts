@@ -82,6 +82,19 @@ export class TaskRepository implements ITaskRepository {
     return this.toDomain(updatedRow);
   }
 
+  async softDeleteById(id: string): Promise<boolean> {
+    const [deletedRow] = await this.db
+      .update(tasks)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+      .returning({ id: tasks.id });
+
+    return deletedRow !== undefined;
+  }
+
   private toDomain(row: TaskRow): Task {
     return new Task({
       id: row.id,

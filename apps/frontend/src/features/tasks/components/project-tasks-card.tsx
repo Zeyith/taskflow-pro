@@ -10,6 +10,8 @@ type ProjectTasksCardProps = {
   isUpdatingUserId?: string;
   isRemovingTaskId?: string;
   isRemovingUserId?: string;
+  isEditingTaskId?: string;
+  isDeletingTaskId?: string;
   getAssigneeLabel: (assigneeUserId: string) => string;
   canUpdateAssigneeStatus: (assigneeUserId: string) => boolean;
   onAssignmentStatusChange: (
@@ -19,6 +21,8 @@ type ProjectTasksCardProps = {
   ) => Promise<void> | void;
   onAddAssignee: (task: Task) => void;
   onRemoveAssignee: (taskId: string, userId: string) => Promise<void> | void;
+  onEditTask: (task: Task) => void;
+  onDeleteTask: (task: Task) => void;
 };
 
 export function ProjectTasksCard({
@@ -28,11 +32,15 @@ export function ProjectTasksCard({
   isUpdatingUserId,
   isRemovingTaskId,
   isRemovingUserId,
+  isEditingTaskId,
+  isDeletingTaskId,
   getAssigneeLabel,
   canUpdateAssigneeStatus,
   onAssignmentStatusChange,
   onAddAssignee,
   onRemoveAssignee,
+  onEditTask,
+  onDeleteTask,
 }: ProjectTasksCardProps): React.JSX.Element {
   return (
     <div className="rounded-3xl border border-border/60 bg-card/95 p-6 shadow-sm lg:col-span-2">
@@ -60,11 +68,15 @@ export function ProjectTasksCard({
               isUpdatingUserId={isUpdatingUserId}
               isRemovingTaskId={isRemovingTaskId}
               isRemovingUserId={isRemovingUserId}
+              isEditingTaskId={isEditingTaskId}
+              isDeletingTaskId={isDeletingTaskId}
               getAssigneeLabel={getAssigneeLabel}
               canUpdateAssigneeStatus={canUpdateAssigneeStatus}
               onAssignmentStatusChange={onAssignmentStatusChange}
               onAddAssignee={onAddAssignee}
               onRemoveAssignee={onRemoveAssignee}
+              onEditTask={onEditTask}
+              onDeleteTask={onDeleteTask}
             />
           ))}
         </div>

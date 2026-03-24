@@ -23,12 +23,14 @@ import {
   AddTaskAssigneeBodySwaggerSchema,
   CreateTaskBodySwaggerSchema,
   UpdateTaskAssignmentStatusBodySwaggerSchema,
+  UpdateTaskBodySwaggerSchema,
   addTaskAssigneeBodySchema,
   createTaskBodySchema,
   projectIdParamSchema,
   taskAssigneeParamsSchema,
   taskIdParamSchema,
   updateTaskAssignmentStatusBodySchema,
+  updateTaskBodySchema,
 } from './dto/task-validation.schema';
 import {
   toTaskDetailResponse,
@@ -102,6 +104,48 @@ export class TasksController {
       data: result.data.map(toTaskListItemResponse),
       meta: result.meta,
     };
+  }
+
+  @Patch('tasks/:id')
+  @ApiOperation({ summary: 'Update task' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    format: 'uuid',
+    example: '11111111-1111-1111-1111-111111111111',
+  })
+  @ApiBody({
+    schema: UpdateTaskBodySwaggerSchema,
+  })
+  async updateTask(
+    @Param() params: unknown,
+    @Body() body: unknown,
+    @CurrentUser() actor: AuthenticatedUser,
+  ): Promise<TaskDetailResponseDto> {
+    const { id } = taskIdParamSchema.parse(params);
+    const parsedBody = updateTaskBodySchema.parse(body);
+    const detail = await this.tasksService.updateTask(actor, id, parsedBody);
+
+    return toTaskDetailResponse(detail);
+  }
+
+  @Delete('tasks/:id')
+  @ApiOperation({ summary: 'Delete task' })
+  @ApiParam({
+    name: 'id',
+    type: String,
+    format: 'uuid',
+    example: '11111111-1111-1111-1111-111111111111',
+  })
+  async deleteTask(
+    @Param() params: unknown,
+    @CurrentUser() actor: AuthenticatedUser,
+  ): Promise<{ success: true }> {
+    const { id } = taskIdParamSchema.parse(params);
+
+    await this.tasksService.deleteTask(actor, id);
+
+    return { success: true };
   }
 
   @Post('tasks/:id/assignees')
