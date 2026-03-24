@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { Toaster } from '@/components/ui/sonner';
+import { RealtimeProvider } from '@/features/realtime/providers/realtime-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 
@@ -16,8 +17,10 @@ export function AppProviders({
   return (
     <ThemeProvider>
       <QueryProvider>
-        {children}
-        <Toaster richColors position="top-right" />
+        <RealtimeProvider>
+          {children}
+          <Toaster richColors position="top-right" />
+        </RealtimeProvider>
       </QueryProvider>
     </ThemeProvider>
   );
