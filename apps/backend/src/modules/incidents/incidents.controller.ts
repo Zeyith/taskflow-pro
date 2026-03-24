@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -17,6 +18,7 @@ import {
   createIncidentSchema,
   incidentIdParamSchema,
   projectIncidentListParamSchema,
+  updateIncidentSchema,
 } from './dto/incidents-validation.schema';
 import { IncidentsService } from './incidents.service';
 
@@ -71,6 +73,22 @@ export class IncidentsController {
     return this.incidentsService.getIncidentById(parsedParams.id, currentUser);
   }
 
+  @Patch('incidents/:id')
+  async updateIncident(
+    @Param() params: unknown,
+    @Body() body: unknown,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const parsedParams = incidentIdParamSchema.parse(params);
+    const parsedBody = updateIncidentSchema.parse(body);
+
+    return this.incidentsService.updateIncident(
+      parsedParams.id,
+      parsedBody,
+      currentUser,
+    );
+  }
+
   @Patch('incidents/:id/close')
   async closeIncident(
     @Param() params: unknown,
@@ -79,5 +97,15 @@ export class IncidentsController {
     const parsedParams = incidentIdParamSchema.parse(params);
 
     return this.incidentsService.closeIncident(parsedParams.id, currentUser);
+  }
+
+  @Delete('incidents/:id')
+  async deleteIncident(
+    @Param() params: unknown,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const parsedParams = incidentIdParamSchema.parse(params);
+
+    return this.incidentsService.deleteIncident(parsedParams.id, currentUser);
   }
 }

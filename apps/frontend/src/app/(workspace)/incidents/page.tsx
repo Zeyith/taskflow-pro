@@ -1,29 +1,45 @@
-"use client";
+'use client';
 
-import { RefreshCcw, ShieldAlert } from "lucide-react";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { RefreshCcw, ShieldAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { IncidentsCreatePanel } from "@/features/incidents/components/incidents-create-panel";
-import { IncidentsList } from "@/features/incidents/components/incidents-list";
-import { IncidentsPageHeader } from "@/features/incidents/components/incidents-page-header";
-import { IncidentsPrioritySidebar } from "@/features/incidents/components/incidents-priority-sidebar";
-import { IncidentsProjectFilterCard } from "@/features/incidents/components/incidents-project-filter-card";
-import { useAccessibleIncidents } from "@/features/incidents/hooks/use-accessible-incidents";
-import { useCreateIncident } from "@/features/incidents/hooks/use-create-incident";
-import type { CreateIncidentSchemaValues } from "@/features/incidents/schemas/create-incident.schema";
-import { useProjects } from "@/features/projects/hooks/use-projects";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { IncidentDeleteDialog } from '@/features/incidents/components/incident-delete-dialog';
+import { IncidentEditDialog } from '@/features/incidents/components/incident-edit-dialog';
+import { IncidentsCreatePanel } from '@/features/incidents/components/incidents-create-panel';
+import { IncidentsList } from '@/features/incidents/components/incidents-list';
+import { IncidentsPageHeader } from '@/features/incidents/components/incidents-page-header';
+import { IncidentsPrioritySidebar } from '@/features/incidents/components/incidents-priority-sidebar';
+import { IncidentsProjectFilterCard } from '@/features/incidents/components/incidents-project-filter-card';
+import { useAccessibleIncidents } from '@/features/incidents/hooks/use-accessible-incidents';
+import { useCreateIncident } from '@/features/incidents/hooks/use-create-incident';
+import { useDeleteIncident } from '@/features/incidents/hooks/use-delete-incident';
+import { useUpdateIncident } from '@/features/incidents/hooks/use-update-incident';
+import type { CreateIncidentSchemaValues } from '@/features/incidents/schemas/create-incident.schema';
+import type { UpdateIncidentSchemaValues } from '@/features/incidents/schemas/update-incident.schema';
+import { useProjects } from '@/features/projects/hooks/use-projects';
+import { useAuthStore } from '@/stores/auth.store';
+import type { Incident } from '@/types/incident';
 
 export default function IncidentsPage(): React.JSX.Element {
+  const user = useAuthStore((state) => state.user);
+  const canCreateIncident = user?.role === 'TEAM_LEAD';
+
   const projectsQuery = useProjects();
   const projects = projectsQuery.data?.data ?? [];
 
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deletingIncident, setDeletingIncident] = useState<Incident | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const createIncidentMutation = useCreateIncident();
+  const updateIncidentMutation = useUpdateIncident();
+  const deleteIncidentMutation = useDeleteIncident();
 
   const incidentsQuery = useAccessibleIncidents({
     projectId: selectedProjectId || undefined,
@@ -41,7 +57,7 @@ export default function IncidentsPage(): React.JSX.Element {
   ): Promise<void> {
     try {
       await createIncidentMutation.mutateAsync(values);
-      toast.success("Incident created successfully.");
+      toast.success('Incident created successfully.');
       void incidentsQuery.refetch();
     } catch (error) {
       const apiError = error as {
@@ -53,7 +69,84 @@ export default function IncidentsPage(): React.JSX.Element {
       };
 
       toast.error(
-        apiError.response?.data?.message ?? "Failed to create the incident.",
+        apiError.response?.data?.message ?? 'Failed to create the incident.',
+      );
+    }
+  }
+
+  function handleDeleteIncident(incident: Incident): void {
+    setDeletingIncident(incident);
+    setIsDeleteDialogOpen(true);
+  }
+
+  async function confirmDeleteIncident(): Promise<void> {
+    if (!deletingIncident) {
+      return;
+    }
+
+    try {
+      await deleteIncidentMutation.mutateAsync({
+        incidentId: deletingIncident.id,
+      });
+
+      toast.success('Incident deleted successfully.');
+
+      if (editingIncident?.id === deletingIncident.id) {
+        setEditingIncident(null);
+        setIsEditDialogOpen(false);
+      }
+
+      setDeletingIncident(null);
+      setIsDeleteDialogOpen(false);
+      void incidentsQuery.refetch();
+    } catch (error) {
+      const apiError = error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      };
+
+      toast.error(
+        apiError.response?.data?.message ?? 'Failed to delete the incident.',
+      );
+    }
+  }
+
+  function handleEditIncident(incident: Incident): void {
+    setEditingIncident(incident);
+    setIsEditDialogOpen(true);
+  }
+
+  async function handleUpdateIncident(
+    values: UpdateIncidentSchemaValues,
+  ): Promise<void> {
+    if (!editingIncident) {
+      return;
+    }
+
+    try {
+      await updateIncidentMutation.mutateAsync({
+        incidentId: editingIncident.id,
+        values,
+      });
+
+      toast.success('Incident updated successfully.');
+      setIsEditDialogOpen(false);
+      setEditingIncident(null);
+      void incidentsQuery.refetch();
+    } catch (error) {
+      const apiError = error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+      };
+
+      toast.error(
+        apiError.response?.data?.message ?? 'Failed to update the incident.',
       );
     }
   }
@@ -183,17 +276,19 @@ export default function IncidentsPage(): React.JSX.Element {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
-          <IncidentsCreatePanel
-            projects={projects.map((project) => ({
-              id: project.id,
-              name: project.name,
-            }))}
-            selectedProjectId={selectedProjectId}
-            isOpen={isCreateFormOpen}
-            isSubmitting={createIncidentMutation.isPending}
-            onOpenChange={setIsCreateFormOpen}
-            onSubmit={handleCreateIncident}
-          />
+          {canCreateIncident ? (
+            <IncidentsCreatePanel
+              projects={projects.map((project) => ({
+                id: project.id,
+                name: project.name,
+              }))}
+              selectedProjectId={selectedProjectId}
+              isOpen={isCreateFormOpen}
+              isSubmitting={createIncidentMutation.isPending}
+              onOpenChange={setIsCreateFormOpen}
+              onSubmit={handleCreateIncident}
+            />
+          ) : null}
 
           <IncidentsList
             incidents={incidents}
@@ -204,6 +299,12 @@ export default function IncidentsPage(): React.JSX.Element {
             onRetry={() => {
               void incidentsQuery.refetch();
             }}
+            onEditIncident={handleEditIncident}
+            onDeleteIncident={handleDeleteIncident}
+            isEditDisabled={
+              updateIncidentMutation.isPending || deleteIncidentMutation.isPending
+            }
+            isDeleteDisabled={deleteIncidentMutation.isPending}
           />
         </div>
 
@@ -215,10 +316,40 @@ export default function IncidentsPage(): React.JSX.Element {
               setSelectedProjectId(nextProjectId);
             }}
           />
-
-          <IncidentsPrioritySidebar incidents={incidents} />
+          <IncidentsPrioritySidebar
+            incidents={incidents}
+            projects={projects}
+          />
         </div>
       </div>
+
+      <IncidentEditDialog
+        incident={editingIncident}
+        isOpen={isEditDialogOpen}
+        isSubmitting={updateIncidentMutation.isPending}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+
+          if (!open) {
+            setEditingIncident(null);
+          }
+        }}
+        onSubmit={handleUpdateIncident}
+      />
+
+      <IncidentDeleteDialog
+        incident={deletingIncident}
+        isOpen={isDeleteDialogOpen}
+        isSubmitting={deleteIncidentMutation.isPending}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+
+          if (!open) {
+            setDeletingIncident(null);
+          }
+        }}
+        onConfirm={confirmDeleteIncident}
+      />
     </section>
   );
 }

@@ -21,6 +21,7 @@ import {
   type FindIncidentRoomsFilters,
   type FindIncidentRoomsResult,
   type IIncidentRoomRepository,
+  type UpdateIncidentRoomPayload,
 } from './interfaces/incident-room.repository.interface';
 
 @Injectable()
@@ -128,6 +129,39 @@ export class IncidentRoomRepository implements IIncidentRoomRepository {
     }
 
     return this.toDomain(updatedRow);
+  }
+
+  async update(
+    id: string,
+    payload: UpdateIncidentRoomPayload,
+  ): Promise<IncidentRoom | null> {
+    const [updatedRow] = await this.db
+      .update(incidentRooms)
+      .set({
+        ...payload,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(incidentRooms.id, id), isNull(incidentRooms.deletedAt)))
+      .returning();
+
+    if (!updatedRow) {
+      return null;
+    }
+
+    return this.toDomain(updatedRow);
+  }
+
+  async softDelete(id: string): Promise<boolean> {
+    const [deletedRow] = await this.db
+      .update(incidentRooms)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(incidentRooms.id, id), isNull(incidentRooms.deletedAt)))
+      .returning({ id: incidentRooms.id });
+
+    return deletedRow !== undefined;
   }
 
   private toDomain(row: IncidentRoomRow): IncidentRoom {

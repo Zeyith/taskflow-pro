@@ -19,6 +19,27 @@ export const createIncidentSchema = z
   })
   .strict();
 
+export const updateIncidentSchema = z
+  .object({
+    title: z.string().trim().min(3).max(255).optional(),
+    description: z.string().trim().max(5000).nullable().optional(),
+    severity: z
+      .enum([
+        INCIDENT_SEVERITY.LOW,
+        INCIDENT_SEVERITY.MEDIUM,
+        INCIDENT_SEVERITY.HIGH,
+        INCIDENT_SEVERITY.CRITICAL,
+      ])
+      .optional(),
+    status: z
+      .enum([INCIDENT_STATUS.ACTIVE, INCIDENT_STATUS.RESOLVED])
+      .optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
 export const incidentIdParamSchema = z
   .object({
     id: trimmedRequiredString,
@@ -51,6 +72,7 @@ export const accessibleIncidentListQuerySchema = z
   .strict();
 
 export type CreateIncidentDto = z.infer<typeof createIncidentSchema>;
+export type UpdateIncidentDto = z.infer<typeof updateIncidentSchema>;
 export type IncidentIdParamDto = z.infer<typeof incidentIdParamSchema>;
 export type ProjectIncidentListParamDto = z.infer<
   typeof projectIncidentListParamSchema

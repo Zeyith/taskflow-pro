@@ -16,6 +16,7 @@ import {
 import type {
   AccessibleIncidentListQueryDto,
   CreateIncidentDto,
+  UpdateIncidentDto,
 } from './dto/incidents-validation.schema';
 import { IncidentCreatedEvent } from './events/incident-created.event';
 import { IncidentResolvedEvent } from './events/incident-resolved.event';
@@ -232,6 +233,85 @@ export class IncidentsService {
     };
   }
 
+  async updateIncident(
+    id: string,
+    payload: UpdateIncidentDto,
+    currentUser: AuthenticatedUser,
+  ): Promise<{
+    data: IncidentResponse;
+    meta: {
+      isCached: boolean;
+    };
+  }> {
+    this.ensureTeamLead(currentUser);
+
+    const incident = await this.incidentRoomRepository.findById(id);
+
+    if (!incident) {
+      throw new NotFoundError('Incident room not found');
+    }
+
+    let closedAt = incident.closedAt;
+
+    if (payload.status) {
+      if (
+        payload.status === INCIDENT_STATUS.RESOLVED &&
+        incident.status !== INCIDENT_STATUS.RESOLVED
+      ) {
+        closedAt = new Date();
+      }
+
+      if (
+        payload.status === INCIDENT_STATUS.ACTIVE &&
+        incident.status === INCIDENT_STATUS.RESOLVED
+      ) {
+        closedAt = null;
+      }
+    }
+
+    const updatedIncident = await this.incidentRoomRepository.update(id, {
+      title: payload.title,
+      description: payload.description,
+      severity: payload.severity,
+      status: payload.status,
+      closedAt,
+    });
+
+    if (!updatedIncident) {
+      throw new NotFoundError('Incident room not found');
+    }
+
+    const updatedIncidentResponse = toIncidentResponse(updatedIncident);
+
+    if (
+      incident.status !== INCIDENT_STATUS.RESOLVED &&
+      updatedIncident.status === INCIDENT_STATUS.RESOLVED
+    ) {
+      this.eventEmitter.emit(
+        'incident.resolved',
+        new IncidentResolvedEvent({
+          incidentId: updatedIncidentResponse.id,
+          projectId: updatedIncidentResponse.projectId,
+          title: updatedIncidentResponse.title,
+          description: updatedIncidentResponse.description,
+          severity: updatedIncidentResponse.severity,
+          status: updatedIncidentResponse.status,
+          createdBy: updatedIncidentResponse.createdBy,
+          closedAt: updatedIncidentResponse.closedAt,
+          createdAt: updatedIncidentResponse.createdAt,
+          updatedAt: updatedIncidentResponse.updatedAt,
+        }),
+      );
+    }
+
+    return {
+      data: updatedIncidentResponse,
+      meta: {
+        isCached: false,
+      },
+    };
+  }
+
   async closeIncident(
     id: string,
     currentUser: AuthenticatedUser,
@@ -282,6 +362,37 @@ export class IncidentsService {
 
     return {
       data: closedIncidentResponse,
+      meta: {
+        isCached: false,
+      },
+    };
+  }
+
+  async deleteIncident(
+    id: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<{
+    data: null;
+    meta: {
+      isCached: boolean;
+    };
+  }> {
+    this.ensureTeamLead(currentUser);
+
+    const incident = await this.incidentRoomRepository.findById(id);
+
+    if (!incident) {
+      throw new NotFoundError('Incident room not found');
+    }
+
+    const deleted = await this.incidentRoomRepository.softDelete(id);
+
+    if (!deleted) {
+      throw new NotFoundError('Incident room not found');
+    }
+
+    return {
+      data: null,
       meta: {
         isCached: false,
       },

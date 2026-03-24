@@ -16,6 +16,10 @@ type IncidentsListProps = {
   selectedProjectName: string | null;
   projects: Project[];
   onRetry: () => void;
+  onEditIncident?: (incident: Incident) => void;
+  onDeleteIncident?: (incident: Incident) => void;
+  isEditDisabled?: boolean;
+  isDeleteDisabled?: boolean;
 };
 
 export function IncidentsList({
@@ -25,6 +29,10 @@ export function IncidentsList({
   selectedProjectName,
   projects,
   onRetry,
+  onEditIncident,
+  onDeleteIncident,
+  isEditDisabled = false,
+  isDeleteDisabled = false,
 }: IncidentsListProps): React.JSX.Element {
   const isAllProjectsView = selectedProjectName === null;
 
@@ -108,6 +116,10 @@ export function IncidentsList({
               ? projectNameById.get(incident.projectId) ?? null
               : null
           }
+          onEdit={onEditIncident}
+          onDelete={onDeleteIncident}
+          isEditDisabled={isEditDisabled}
+          isDeleteDisabled={isDeleteDisabled}
         />
       ))}
     </div>

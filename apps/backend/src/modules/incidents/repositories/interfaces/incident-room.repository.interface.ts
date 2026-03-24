@@ -16,10 +16,20 @@ export type FindIncidentRoomsResult = {
   total: number;
 };
 
+export type UpdateIncidentRoomPayload = {
+  title?: string;
+  description?: string | null;
+  severity?: IncidentRoom['severity'];
+  status?: IncidentRoom['status'];
+  closedAt?: Date | null;
+};
+
 export interface IIncidentRoomRepository {
   create(incidentRoom: NewIncidentRoomRow): Promise<IncidentRoom>;
   findById(id: string): Promise<IncidentRoom | null>;
   findByProjectId(projectId: string): Promise<IncidentRoom[]>;
   findMany(filters: FindIncidentRoomsFilters): Promise<FindIncidentRoomsResult>;
   close(id: string, closedAt: Date): Promise<IncidentRoom | null>;
+  update(id: string, payload: UpdateIncidentRoomPayload): Promise<IncidentRoom | null>;
+  softDelete(id: string): Promise<boolean>;
 }

@@ -1,6 +1,6 @@
-export type IncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string;
+export type IncidentSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export type IncidentStatus = 'OPEN' | 'RESOLVED' | 'CLOSED' | string;
+export type IncidentStatus = 'ACTIVE' | 'RESOLVED';
 
 export type Incident = {
   id: string;

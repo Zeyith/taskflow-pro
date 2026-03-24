@@ -1,6 +1,10 @@
 'use client';
 
+import { Pencil, Trash2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useAuthStore } from '@/stores/auth.store';
 import {
   getIncidentSeverityClassName,
   getIncidentSeverityLabel,
@@ -13,12 +17,23 @@ import type { Incident } from '@/types/incident';
 type IncidentListItemProps = {
   incident: Incident;
   projectName?: string | null;
+  onEdit?: (incident: Incident) => void;
+  onDelete?: (incident: Incident) => void;
+  isEditDisabled?: boolean;
+  isDeleteDisabled?: boolean;
 };
 
 export function IncidentListItem({
   incident,
   projectName,
+  onEdit,
+  onDelete,
+  isEditDisabled = false,
+  isDeleteDisabled = false,
 }: IncidentListItemProps): React.JSX.Element {
+  const user = useAuthStore((state) => state.user);
+  const canManageIncident = user?.role === 'TEAM_LEAD';
+
   return (
     <Card className="rounded-3xl border border-white/10 bg-white/[0.03]">
       <CardContent className="p-6">
@@ -59,8 +74,42 @@ export function IncidentListItem({
             </p>
           </div>
 
-          <div className="text-xs text-zinc-500">
-            {formatDateTime(incident.createdAt)}
+          <div className="flex flex-col items-end gap-3">
+            <div className="text-xs text-zinc-500">
+              {formatDateTime(incident.createdAt)}
+            </div>
+
+            {canManageIncident ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/10 bg-transparent text-white hover:bg-white hover:text-black"
+                  disabled={isEditDisabled}
+                  onClick={() => {
+                    onEdit?.(incident);
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-red-500/30 bg-transparent text-red-300 hover:bg-red-500 hover:text-white"
+                  disabled={isDeleteDisabled}
+                  onClick={() => {
+                    onDelete?.(incident);
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       </CardContent>

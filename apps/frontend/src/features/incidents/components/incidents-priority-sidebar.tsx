@@ -1,6 +1,10 @@
+'use client';
+
+import type { Project } from '@/types/project';
 import type { Incident } from '@/types/incident';
 
 import { AlertTriangle, Siren } from 'lucide-react';
+import { useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +15,7 @@ import {
 
 type IncidentsPrioritySidebarProps = {
   incidents: Incident[];
+  projects: Project[];
 };
 
 function getSeverityBadgeClassName(severity: Incident['severity']): string {
@@ -30,10 +35,8 @@ function getSeverityBadgeClassName(severity: Incident['severity']): string {
 
 function getStatusBadgeClassName(status: Incident['status']): string {
   switch (status) {
-    case 'OPEN':
-      return 'border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300';
-    case 'ACKNOWLEDGED':
-      return 'border border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300';
+    case 'ACTIVE':
+      return 'border border-zinc-500/30 bg-zinc-500/10 text-zinc-200';
     case 'RESOLVED':
       return 'border border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300';
     default:
@@ -41,14 +44,22 @@ function getStatusBadgeClassName(status: Incident['status']): string {
   }
 }
 
-function PriorityIncidentCard({ incident }: { incident: Incident }) {
+type PriorityIncidentCardProps = {
+  incident: Incident;
+  projectName: string | null;
+};
+
+function PriorityIncidentCard({
+  incident,
+  projectName,
+}: PriorityIncidentCardProps) {
   return (
     <div className="rounded-xl border bg-background p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-semibold leading-none">{incident.title}</p>
           <p className="text-xs text-muted-foreground">
-            Project ID: {incident.projectId}
+            Project: {projectName ?? 'Unknown project'}
           </p>
         </div>
 
@@ -74,7 +85,12 @@ function PriorityIncidentCard({ incident }: { incident: Incident }) {
 
 export function IncidentsPrioritySidebar({
   incidents,
+  projects,
 }: IncidentsPrioritySidebarProps) {
+  const projectNameById = useMemo(() => {
+    return new Map(projects.map((project) => [project.id, project.name]));
+  }, [projects]);
+
   const criticalIncidents = incidents.filter(
     (incident) => incident.severity === 'CRITICAL',
   );
@@ -96,7 +112,11 @@ export function IncidentsPrioritySidebar({
         <CardContent className="space-y-3">
           {criticalIncidents.length > 0 ? (
             criticalIncidents.map((incident) => (
-              <PriorityIncidentCard key={incident.id} incident={incident} />
+              <PriorityIncidentCard
+                key={incident.id}
+                incident={incident}
+                projectName={projectNameById.get(incident.projectId) ?? null}
+              />
             ))
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -117,7 +137,11 @@ export function IncidentsPrioritySidebar({
         <CardContent className="space-y-3">
           {highIncidents.length > 0 ? (
             highIncidents.map((incident) => (
-              <PriorityIncidentCard key={incident.id} incident={incident} />
+              <PriorityIncidentCard
+                key={incident.id}
+                incident={incident}
+                projectName={projectNameById.get(incident.projectId) ?? null}
+              />
             ))
           ) : (
             <p className="text-sm text-muted-foreground">
