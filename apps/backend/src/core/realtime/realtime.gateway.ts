@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,16 +10,9 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { ZodError } from 'zod';
 
 import { AppConfig } from '../../common/configs/app.config';
-import { AuthenticationError } from '../../common/exceptions/authentication.exception';
-import { AuthorizationError } from '../../common/exceptions/authorization.exception';
-import { NotFoundError } from '../../common/exceptions/not-found.exception';
-import {
-  authTokenPayloadSchema,
-  type AuthTokenPayload,
-} from '../../common/types/auth-token-payload.type';
+import type { AuthenticatedUser } from '../../common/types/authenticated-user.type';
 import { IncidentCreatedEvent } from '../../modules/incidents/events/incident-created.event';
 import { IncidentResolvedEvent } from '../../modules/incidents/events/incident-resolved.event';
 import { NotificationCreatedEvent } from '../../modules/notifications/events/notification-created.event';
@@ -32,32 +25,44 @@ import {
   type PresenceHeartbeatDto,
 } from '../../modules/presence/dto/presence-validation.schema';
 import { PresenceService } from '../../modules/presence/presence.service';
+import { ProjectMemberAddedEvent } from '../../modules/projects/events/project-member-added.event';
+import { ProjectMemberRemovedEvent } from '../../modules/projects/events/project-member-removed.event';
+import { TaskAssigneeAddedEvent } from '../../modules/tasks/events/task-assignee-added.event';
+import { TaskAssigneeRemovedEvent } from '../../modules/tasks/events/task-assignee-removed.event';
 import { TaskAssignmentStatusChangedEvent } from '../../modules/tasks/events/task-assignment-status-changed.event';
+import { TaskCreatedEvent } from '../../modules/tasks/events/task-created.event';
+import { TaskDeletedEvent } from '../../modules/tasks/events/task-deleted.event';
+import { TaskUpdatedEvent } from '../../modules/tasks/events/task-updated.event';
 import { ConnectionManagerService } from './connection-manager.service';
 import { RealtimeAccessService } from './realtime-access.service';
 import {
+  RealtimeClientEvent,
   RealtimeEvent,
   RealtimeRoom,
   SOCKET_NAMESPACE,
 } from './realtime.constants';
 
-type SocketAuthUser = Readonly<AuthTokenPayload>;
-
 type ClientToServerEvents = {
-  'project.join': (payload: { projectId: string }) => void;
-  'project.leave': (payload: { projectId: string }) => void;
-  'presence.heartbeat': (payload: PresenceHeartbeatDto) => void;
-  'presence.focused-task.set': (payload: PresenceFocusedTaskSetDto) => void;
+  [RealtimeClientEvent.projectJoin]: (payload: { projectId: string }) => void;
+  [RealtimeClientEvent.projectLeave]: (payload: { projectId: string }) => void;
+  [PresenceEvent.heartbeat]: (payload: PresenceHeartbeatDto) => void;
+  [PresenceEvent.focusedTaskSet]: (payload: PresenceFocusedTaskSetDto) => void;
 };
 
 type ServerToClientEvents = {
-  'connection.established': (payload: {
+  [RealtimeEvent.connectionEstablished]: (payload: {
     userId: string;
     socketId: string;
   }) => void;
-  'project.joined': (payload: { projectId: string; room: string }) => void;
-  'project.left': (payload: { projectId: string; room: string }) => void;
-  'task.assignment.status.changed': (payload: {
+  [RealtimeEvent.projectJoined]: (payload: {
+    projectId: string;
+    room: string;
+  }) => void;
+  [RealtimeEvent.projectLeft]: (payload: {
+    projectId: string;
+    room: string;
+  }) => void;
+  [RealtimeEvent.taskAssignmentStatusChanged]: (payload: {
     projectId: string;
     taskId: string;
     assigneeUserId: string;
@@ -74,32 +79,71 @@ type ServerToClientEvents = {
     };
     occurredAt: string;
   }) => void;
-  'notification.created': (payload: {
+  [RealtimeEvent.projectMemberAdded]: (payload: {
+    projectId: string;
+    userId: string;
+    addedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.projectMemberRemoved]: (payload: {
+    projectId: string;
+    userId: string;
+    removedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.taskCreated]: (payload: {
+    projectId: string;
+    taskId: string;
+    createdBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.taskUpdated]: (payload: {
+    projectId: string;
+    taskId: string;
+    updatedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.taskDeleted]: (payload: {
+    projectId: string;
+    taskId: string;
+    deletedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.taskAssigneeAdded]: (payload: {
+    projectId: string;
+    taskId: string;
+    userId: string;
+    addedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.taskAssigneeRemoved]: (payload: {
+    projectId: string;
+    taskId: string;
+    userId: string;
+    removedBy: string;
+    occurredAt: string;
+  }) => void;
+  [RealtimeEvent.notificationCreated]: (payload: {
     notificationId: string;
     recipientUserId: string;
-    projectId: string | null;
-    taskId: string | null;
     type: string;
     title: string;
     message: string;
     isRead: boolean;
-    createdBy: string;
-    readAt: string | null;
     createdAt: string;
-    updatedAt: string;
   }) => void;
-  'notification.unread-count.updated': (payload: {
+  [RealtimeEvent.notificationUnreadCountUpdated]: (payload: {
     recipientUserId: string;
     unreadCount: number;
   }) => void;
-  'presence.user.updated': (payload: {
+  [PresenceEvent.userUpdated]: (payload: {
     projectId: string;
     userId: string;
     isOnline: boolean;
     focusedTaskId: string | null;
     lastSeenAt: string;
   }) => void;
-  'incident.created': (payload: {
+  [RealtimeEvent.incidentCreated]: (payload: {
     incidentId: string;
     projectId: string;
     title: string;
@@ -111,7 +155,7 @@ type ServerToClientEvents = {
     createdAt: string;
     updatedAt: string;
   }) => void;
-  'incident.resolved': (payload: {
+  [RealtimeEvent.incidentResolved]: (payload: {
     incidentId: string;
     projectId: string;
     title: string;
@@ -123,7 +167,7 @@ type ServerToClientEvents = {
     createdAt: string;
     updatedAt: string;
   }) => void;
-  'realtime.error': (payload: {
+  [RealtimeEvent.error]: (payload: {
     type: string;
     error: string;
     message: string;
@@ -133,84 +177,17 @@ type ServerToClientEvents = {
   }) => void;
 };
 
-type InterServerEvents = Record<string, never>;
-
 type SocketData = {
-  user?: SocketAuthUser;
+  user: AuthenticatedUser;
 };
 
 type AppSocket = Socket<
   ClientToServerEvents,
   ServerToClientEvents,
-  InterServerEvents,
+  never,
   SocketData
 >;
 
-type ProjectRoomBody = {
-  projectId?: unknown;
-};
-
-function extractBearer(authHeader: unknown): string | null {
-  if (typeof authHeader !== 'string') {
-    return null;
-  }
-
-  const trimmed = authHeader.trim();
-
-  if (!trimmed.toLowerCase().startsWith('bearer ')) {
-    return null;
-  }
-
-  const token = trimmed.slice('bearer '.length).trim();
-
-  return token.length > 0 ? token : null;
-}
-
-function getAuthTokenFromHandshakeAuth(auth: unknown): string | null {
-  if (typeof auth !== 'object' || auth === null) {
-    return null;
-  }
-
-  const record = auth as Record<string, unknown>;
-  const token = record.token;
-
-  if (typeof token === 'string' && token.trim().length > 0) {
-    return token.trim();
-  }
-
-  return null;
-}
-
-function extractToken(client: AppSocket): string | null {
-  const authToken = getAuthTokenFromHandshakeAuth(client.handshake.auth);
-
-  if (authToken) {
-    return authToken;
-  }
-
-  const authorizationHeader = client.handshake.headers.authorization;
-
-  return extractBearer(authorizationHeader);
-}
-
-function extractProjectId(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null) {
-    return null;
-  }
-
-  const record = body as ProjectRoomBody;
-  const projectId = record.projectId;
-
-  if (typeof projectId !== 'string') {
-    return null;
-  }
-
-  const trimmed = projectId.trim();
-
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-@Injectable()
 @WebSocketGateway({
   namespace: SOCKET_NAMESPACE,
   cors: {
@@ -219,13 +196,13 @@ function extractProjectId(body: unknown): string | null {
   },
 })
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection<AppSocket>, OnGatewayDisconnect<AppSocket>
 {
   @WebSocketServer()
   server!: Server<
     ClientToServerEvents,
     ServerToClientEvents,
-    InterServerEvents,
+    never,
     SocketData
   >;
 
@@ -240,50 +217,39 @@ export class RealtimeGateway
   ) {}
 
   async handleConnection(client: AppSocket): Promise<void> {
-    const token = extractToken(client);
+    const token = this.extractToken(client);
 
     if (!token) {
-      this.reject(client, new AuthenticationError('JWT token is required'));
+      client.disconnect();
       return;
     }
 
-    try {
-      const rawPayload = this.jwtService.verify<Record<string, unknown>>(
-        token,
-        {
-          secret: this.appConfig.jwt.secret,
-        },
-      );
+    const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(
+      token,
+      {
+        secret: this.appConfig.jwt.secret,
+      },
+    );
 
-      const payload = authTokenPayloadSchema.parse(rawPayload);
+    client.data.user = payload;
 
-      client.data.user = {
-        sub: payload.sub,
-        email: payload.email,
-        role: payload.role,
-      };
+    this.connectionManager.addConnection(payload.sub, client.id);
 
-      this.connectionManager.addConnection(payload.sub, client.id);
+    await client.join(RealtimeRoom.user(payload.sub));
 
-      await client.join(RealtimeRoom.user(payload.sub));
+    client.emit(RealtimeEvent.connectionEstablished, {
+      userId: payload.sub,
+      socketId: client.id,
+    });
 
-      client.emit(RealtimeEvent.connectionEstablished, {
+    this.logger.log(
+      JSON.stringify({
+        message: 'Realtime client connected',
         userId: payload.sub,
         socketId: client.id,
-      });
-
-      this.logger.log(
-        JSON.stringify({
-          message: 'Socket connected',
-          userId: payload.sub,
-          socketId: client.id,
-          namespace: SOCKET_NAMESPACE,
-          timestamp: new Date().toISOString(),
-        }),
-      );
-    } catch {
-      this.reject(client, new AuthenticationError('Invalid or expired token'));
-    }
+        timestamp: new Date().toISOString(),
+      }),
+    );
   }
 
   async handleDisconnect(client: AppSocket): Promise<void> {
@@ -298,399 +264,252 @@ export class RealtimeGateway
 
     this.logger.log(
       JSON.stringify({
-        message: 'Socket disconnected',
+        message: 'Realtime client disconnected',
         userId: user.sub,
         socketId: client.id,
-        namespace: SOCKET_NAMESPACE,
         timestamp: new Date().toISOString(),
       }),
     );
   }
 
-  @SubscribeMessage('project.join')
+  @SubscribeMessage(RealtimeClientEvent.projectJoin)
   async onProjectJoin(
     @ConnectedSocket() client: AppSocket,
-    @MessageBody() body: unknown,
-  ): Promise<{ joined: string }> {
+    @MessageBody() payload: { projectId: string },
+  ): Promise<void> {
     const user = client.data.user;
+    const projectId = payload.projectId;
 
-    if (!user) {
-      this.reject(client, new AuthenticationError('Unauthenticated socket'));
-      return { joined: '' };
-    }
-
-    const projectId = extractProjectId(body);
-
-    if (!projectId) {
-      client.emit(RealtimeEvent.error, {
-        type: 'VALIDATION_ERROR',
-        error: 'ValidationError',
-        message: 'projectId is required',
-        timestamp: new Date().toISOString(),
-        path: 'ws://realtime',
-        statusCode: 400,
-      });
-
-      return { joined: '' };
-    }
-
-    try {
-      await this.realtimeAccessService.ensureProjectRoomJoinAllowed(
-        user,
-        projectId,
-      );
-    } catch (error) {
-      if (
-        error instanceof AuthorizationError ||
-        error instanceof NotFoundError
-      ) {
-        client.emit(RealtimeEvent.error, {
-          type: error.type,
-          error: error.error,
-          message: error.message,
-          timestamp: new Date().toISOString(),
-          path: 'ws://realtime',
-          statusCode: error.statusCode,
-        });
-
-        return { joined: '' };
-      }
-
-      client.emit(RealtimeEvent.error, {
-        type: 'INTERNAL_SERVER_ERROR',
-        error: 'InternalServerError',
-        message: 'Unexpected websocket error',
-        timestamp: new Date().toISOString(),
-        path: 'ws://realtime',
-        statusCode: 500,
-      });
-
-      return { joined: '' };
-    }
+    await this.realtimeAccessService.ensureProjectRoomJoinAllowed(
+      user,
+      projectId,
+    );
 
     const room = RealtimeRoom.project(projectId);
 
     await client.join(room);
 
-    client.emit('project.joined', {
+    client.emit(RealtimeEvent.projectJoined, {
       projectId,
       room,
     });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Project room joined',
-        userId: user.sub,
-        projectId,
-        socketId: client.id,
-        room,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-
-    return { joined: room };
   }
 
-  @SubscribeMessage('project.leave')
+  @SubscribeMessage(RealtimeClientEvent.projectLeave)
   async onProjectLeave(
     @ConnectedSocket() client: AppSocket,
-    @MessageBody() body: unknown,
-  ): Promise<{ left: string }> {
-    const user = client.data.user;
-
-    if (!user) {
-      this.reject(client, new AuthenticationError('Unauthenticated socket'));
-      return { left: '' };
-    }
-
-    const projectId = extractProjectId(body);
-
-    if (!projectId) {
-      client.emit(RealtimeEvent.error, {
-        type: 'VALIDATION_ERROR',
-        error: 'ValidationError',
-        message: 'projectId is required',
-        timestamp: new Date().toISOString(),
-        path: 'ws://realtime',
-        statusCode: 400,
-      });
-
-      return { left: '' };
-    }
-
-    const room = RealtimeRoom.project(projectId);
+    @MessageBody() payload: { projectId: string },
+  ): Promise<void> {
+    const room = RealtimeRoom.project(payload.projectId);
 
     await client.leave(room);
 
-    client.emit('project.left', {
-      projectId,
+    client.emit(RealtimeEvent.projectLeft, {
+      projectId: payload.projectId,
       room,
     });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Project room left',
-        userId: user.sub,
-        projectId,
-        socketId: client.id,
-        room,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-
-    return { left: room };
   }
 
   @SubscribeMessage(PresenceEvent.heartbeat)
   async handlePresenceHeartbeat(
     @ConnectedSocket() client: AppSocket,
-    @MessageBody() payload: unknown,
+    @MessageBody() payload: PresenceHeartbeatDto,
   ): Promise<void> {
+    const parsedPayload = presenceHeartbeatSchema.parse(payload);
     const user = client.data.user;
 
-    if (!user) {
-      this.reject(client, new AuthenticationError('Unauthenticated socket'));
-      return;
-    }
+    const result = await this.presenceService.heartbeat(
+      parsedPayload.projectId,
+      {
+        sub: user.sub,
+        email: user.email,
+        role: user.role,
+      },
+    );
 
-    try {
-      const parsedPayload: PresenceHeartbeatDto =
-        presenceHeartbeatSchema.parse(payload);
+    const focusedTaskState = await this.presenceService.getFocusedTaskState(
+      user.sub,
+    );
 
-      const result = await this.presenceService.heartbeat(
-        parsedPayload.projectId,
-        {
-          sub: user.sub,
-          email: user.email,
-          role: user.role,
-        },
-      );
-
-      const focusedTaskState = await this.presenceService.getFocusedTaskState(
-        user.sub,
-      );
-
-      this.server
-        .to(RealtimeRoom.project(parsedPayload.projectId))
-        .emit(PresenceEvent.userUpdated, {
-          projectId: parsedPayload.projectId,
-          userId: result.data.userId,
-          isOnline: result.data.isOnline,
-          focusedTaskId: focusedTaskState?.taskId ?? null,
-          lastSeenAt: result.data.lastSeenAt,
-        });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        client.emit(RealtimeEvent.error, {
-          type: 'VALIDATION_ERROR',
-          error: 'ValidationError',
-          message: 'Invalid websocket payload',
-          timestamp: new Date().toISOString(),
-          path: 'ws://realtime',
-          statusCode: 400,
-        });
-
-        return;
-      }
-
-      if (
-        error instanceof AuthorizationError ||
-        error instanceof NotFoundError
-      ) {
-        client.emit(RealtimeEvent.error, {
-          type: error.type,
-          error: error.error,
-          message: error.message,
-          timestamp: new Date().toISOString(),
-          path: 'ws://realtime',
-          statusCode: error.statusCode,
-        });
-
-        return;
-      }
-
-      client.emit(RealtimeEvent.error, {
-        type: 'INTERNAL_SERVER_ERROR',
-        error: 'InternalServerError',
-        message: 'Unexpected websocket error',
-        timestamp: new Date().toISOString(),
-        path: 'ws://realtime',
-        statusCode: 500,
+    this.server
+      .to(RealtimeRoom.project(parsedPayload.projectId))
+      .emit(PresenceEvent.userUpdated, {
+        projectId: parsedPayload.projectId,
+        userId: result.data.userId,
+        isOnline: result.data.isOnline,
+        focusedTaskId: focusedTaskState?.taskId ?? null,
+        lastSeenAt: result.data.lastSeenAt,
       });
-    }
   }
 
   @SubscribeMessage(PresenceEvent.focusedTaskSet)
   async handlePresenceFocusedTaskSet(
     @ConnectedSocket() client: AppSocket,
-    @MessageBody() payload: unknown,
+    @MessageBody() payload: PresenceFocusedTaskSetDto,
   ): Promise<void> {
+    const parsedPayload = presenceFocusedTaskSetSchema.parse(payload);
     const user = client.data.user;
 
-    if (!user) {
-      this.reject(client, new AuthenticationError('Unauthenticated socket'));
-      return;
-    }
+    const focusedTaskResult = await this.presenceService.setFocusedTask(
+      parsedPayload.projectId,
+      parsedPayload.taskId,
+      {
+        sub: user.sub,
+        email: user.email,
+        role: user.role,
+      },
+    );
 
-    try {
-      const parsedPayload: PresenceFocusedTaskSetDto =
-        presenceFocusedTaskSetSchema.parse(payload);
+    const onlineState = await this.presenceService.getOnlineState(user.sub);
 
-      const focusedTaskResult = await this.presenceService.setFocusedTask(
-        parsedPayload.projectId,
-        parsedPayload.taskId,
-        {
-          sub: user.sub,
-          email: user.email,
-          role: user.role,
-        },
-      );
-
-      const onlineState = await this.presenceService.getOnlineState(user.sub);
-
-      this.server
-        .to(RealtimeRoom.project(parsedPayload.projectId))
-        .emit(PresenceEvent.userUpdated, {
-          projectId: parsedPayload.projectId,
-          userId: user.sub,
-          isOnline: onlineState?.isOnline ?? false,
-          focusedTaskId: focusedTaskResult.data.taskId,
-          lastSeenAt:
-            onlineState?.lastSeenAt ?? focusedTaskResult.data.updatedAt,
-        });
-    } catch (error) {
-      if (error instanceof ZodError) {
-        client.emit(RealtimeEvent.error, {
-          type: 'VALIDATION_ERROR',
-          error: 'ValidationError',
-          message: 'Invalid websocket payload',
-          timestamp: new Date().toISOString(),
-          path: 'ws://realtime',
-          statusCode: 400,
-        });
-
-        return;
-      }
-
-      if (
-        error instanceof AuthorizationError ||
-        error instanceof NotFoundError
-      ) {
-        client.emit(RealtimeEvent.error, {
-          type: error.type,
-          error: error.error,
-          message: error.message,
-          timestamp: new Date().toISOString(),
-          path: 'ws://realtime',
-          statusCode: error.statusCode,
-        });
-
-        return;
-      }
-
-      client.emit(RealtimeEvent.error, {
-        type: 'INTERNAL_SERVER_ERROR',
-        error: 'InternalServerError',
-        message: 'Unexpected websocket error',
-        timestamp: new Date().toISOString(),
-        path: 'ws://realtime',
-        statusCode: 500,
+    this.server
+      .to(RealtimeRoom.project(parsedPayload.projectId))
+      .emit(PresenceEvent.userUpdated, {
+        projectId: parsedPayload.projectId,
+        userId: user.sub,
+        isOnline: onlineState?.isOnline ?? false,
+        focusedTaskId: focusedTaskResult.data.taskId,
+        lastSeenAt: onlineState?.lastSeenAt ?? focusedTaskResult.data.updatedAt,
       });
-    }
   }
 
   emitTaskAssignmentStatusChanged(
     event: TaskAssignmentStatusChangedEvent,
   ): void {
     const { props } = event;
-    const projectRoom = RealtimeRoom.project(props.projectId);
+    const room = RealtimeRoom.project(props.projectId);
 
-    this.server
-      .to(projectRoom)
-      .emit(RealtimeEvent.taskAssignmentStatusChanged, {
-        projectId: props.projectId,
-        taskId: props.taskId,
-        assigneeUserId: props.assigneeUserId,
-        oldStatus: props.oldStatus,
-        newStatus: props.newStatus,
-        changedBy: props.changedBy,
-        summaryStatus: props.summaryStatus,
-        breakdown: props.breakdown,
-        occurredAt: props.occurredAt,
-      });
+    this.server.to(room).emit(RealtimeEvent.taskAssignmentStatusChanged, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      assigneeUserId: props.assigneeUserId,
+      oldStatus: props.oldStatus,
+      newStatus: props.newStatus,
+      changedBy: props.changedBy,
+      summaryStatus: props.summaryStatus,
+      breakdown: props.breakdown,
+      occurredAt: props.occurredAt,
+    });
+  }
 
-    this.logger.log(
-      JSON.stringify({
-        message: 'Task assignment status changed event published',
-        projectId: props.projectId,
-        taskId: props.taskId,
-        assigneeUserId: props.assigneeUserId,
-        changedBy: props.changedBy,
-        room: projectRoom,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+  emitProjectMemberAdded(event: ProjectMemberAddedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.projectMemberAdded, {
+      projectId: props.projectId,
+      userId: props.userId,
+      addedBy: props.addedBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitProjectMemberRemoved(event: ProjectMemberRemovedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.projectMemberRemoved, {
+      projectId: props.projectId,
+      userId: props.userId,
+      removedBy: props.removedBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitTaskCreated(event: TaskCreatedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.taskCreated, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      createdBy: props.createdBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitTaskUpdated(event: TaskUpdatedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.taskUpdated, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      updatedBy: props.updatedBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitTaskDeleted(event: TaskDeletedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.taskDeleted, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      deletedBy: props.deletedBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitTaskAssigneeAdded(event: TaskAssigneeAddedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.taskAssigneeAdded, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      userId: props.userId,
+      addedBy: props.addedBy,
+      occurredAt: props.occurredAt,
+    });
+  }
+
+  emitTaskAssigneeRemoved(event: TaskAssigneeRemovedEvent): void {
+    const { props } = event;
+    const room = RealtimeRoom.project(props.projectId);
+
+    this.server.to(room).emit(RealtimeEvent.taskAssigneeRemoved, {
+      projectId: props.projectId,
+      taskId: props.taskId,
+      userId: props.userId,
+      removedBy: props.removedBy,
+      occurredAt: props.occurredAt,
+    });
   }
 
   emitNotificationCreated(event: NotificationCreatedEvent): void {
     const { props } = event;
-    const userRoom = RealtimeRoom.user(props.recipientUserId);
+    const room = RealtimeRoom.user(props.recipientUserId);
 
-    this.server.to(userRoom).emit(RealtimeEvent.notificationCreated, {
+    this.server.to(room).emit(RealtimeEvent.notificationCreated, {
       notificationId: props.notificationId,
       recipientUserId: props.recipientUserId,
-      projectId: props.projectId,
-      taskId: props.taskId,
       type: props.type,
       title: props.title,
       message: props.message,
       isRead: props.isRead,
-      createdBy: props.createdBy,
-      readAt: props.readAt,
       createdAt: props.createdAt,
-      updatedAt: props.updatedAt,
     });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Notification created event published',
-        notificationId: props.notificationId,
-        recipientUserId: props.recipientUserId,
-        room: userRoom,
-        timestamp: new Date().toISOString(),
-      }),
-    );
   }
 
   emitNotificationUnreadCountUpdated(
     event: NotificationUnreadCountUpdatedEvent,
   ): void {
     const { props } = event;
-    const userRoom = RealtimeRoom.user(props.recipientUserId);
+    const room = RealtimeRoom.user(props.recipientUserId);
 
-    this.server
-      .to(userRoom)
-      .emit(RealtimeEvent.notificationUnreadCountUpdated, {
-        recipientUserId: props.recipientUserId,
-        unreadCount: props.unreadCount,
-      });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Notification unread count updated event published',
-        recipientUserId: props.recipientUserId,
-        unreadCount: props.unreadCount,
-        room: userRoom,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    this.server.to(room).emit(RealtimeEvent.notificationUnreadCountUpdated, {
+      recipientUserId: props.recipientUserId,
+      unreadCount: props.unreadCount,
+    });
   }
 
   emitIncidentCreated(event: IncidentCreatedEvent): void {
     const { props } = event;
-    const projectRoom = RealtimeRoom.project(props.projectId);
+    const room = RealtimeRoom.project(props.projectId);
 
-    this.server.to(projectRoom).emit(RealtimeEvent.incidentCreated, {
+    this.server.to(room).emit(RealtimeEvent.incidentCreated, {
       incidentId: props.incidentId,
       projectId: props.projectId,
       title: props.title,
@@ -702,23 +521,13 @@ export class RealtimeGateway
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Incident created event published',
-        incidentId: props.incidentId,
-        projectId: props.projectId,
-        room: projectRoom,
-        timestamp: new Date().toISOString(),
-      }),
-    );
   }
 
   emitIncidentResolved(event: IncidentResolvedEvent): void {
     const { props } = event;
-    const projectRoom = RealtimeRoom.project(props.projectId);
+    const room = RealtimeRoom.project(props.projectId);
 
-    this.server.to(projectRoom).emit(RealtimeEvent.incidentResolved, {
+    this.server.to(room).emit(RealtimeEvent.incidentResolved, {
       incidentId: props.incidentId,
       projectId: props.projectId,
       title: props.title,
@@ -730,28 +539,31 @@ export class RealtimeGateway
       createdAt: props.createdAt,
       updatedAt: props.updatedAt,
     });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Incident resolved event published',
-        incidentId: props.incidentId,
-        projectId: props.projectId,
-        room: projectRoom,
-        timestamp: new Date().toISOString(),
-      }),
-    );
   }
 
-  private reject(client: AppSocket, error: AuthenticationError): void {
-    client.emit(RealtimeEvent.error, {
-      type: 'AUTHENTICATION_ERROR',
-      error: error.name,
-      message: error.message,
-      timestamp: new Date().toISOString(),
-      path: 'ws://realtime',
-      statusCode: 401,
-    });
+  private extractToken(client: AppSocket): string | null {
+    const authPayload: unknown = client.handshake.auth;
+    const authToken =
+      typeof authPayload === 'object' &&
+      authPayload !== null &&
+      'token' in authPayload &&
+      typeof authPayload.token === 'string'
+        ? authPayload.token
+        : null;
 
-    client.disconnect(true);
+    if (authToken && authToken.length > 0) {
+      return authToken;
+    }
+
+    const authorizationHeader = client.handshake.headers.authorization;
+
+    if (
+      typeof authorizationHeader === 'string' &&
+      authorizationHeader.startsWith('Bearer ')
+    ) {
+      return authorizationHeader.slice('Bearer '.length);
+    }
+
+    return null;
   }
 }

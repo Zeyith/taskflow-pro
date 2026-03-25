@@ -30,6 +30,9 @@ export interface IIncidentRoomRepository {
   findByProjectId(projectId: string): Promise<IncidentRoom[]>;
   findMany(filters: FindIncidentRoomsFilters): Promise<FindIncidentRoomsResult>;
   close(id: string, closedAt: Date): Promise<IncidentRoom | null>;
-  update(id: string, payload: UpdateIncidentRoomPayload): Promise<IncidentRoom | null>;
+  update(
+    id: string,
+    payload: UpdateIncidentRoomPayload,
+  ): Promise<IncidentRoom | null>;
   softDelete(id: string): Promise<boolean>;
 }

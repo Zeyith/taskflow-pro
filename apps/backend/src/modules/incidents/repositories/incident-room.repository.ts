@@ -1,13 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 
 import { DATABASE_CONNECTION } from '../../../core/database/database.module';
 import type { AppDb } from '../../../core/database/database.types';

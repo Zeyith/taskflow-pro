@@ -22,7 +22,12 @@ import {
 import type { UpdateTaskBodyDto } from './dto/task-validation.schema';
 import { Task } from './entities/task.entity';
 import { TaskAssignee } from './entities/task-assignee.entity';
+import { TaskAssigneeAddedEvent } from './events/task-assignee-added.event';
+import { TaskAssigneeRemovedEvent } from './events/task-assignee-removed.event';
 import { TaskAssignmentStatusChangedEvent } from './events/task-assignment-status-changed.event';
+import { TaskCreatedEvent } from './events/task-created.event';
+import { TaskDeletedEvent } from './events/task-deleted.event';
+import { TaskUpdatedEvent } from './events/task-updated.event';
 import {
   TASK_ASSIGNEE_REPOSITORY,
   type ITaskAssigneeRepository,
@@ -132,6 +137,16 @@ export class TasksService {
         : await this.recalculateAndPersistSummaryStatus(task.id);
 
     await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+    this.eventEmitter.emit(
+      TaskCreatedEvent.eventName,
+      new TaskCreatedEvent({
+        projectId: updatedTask.projectId,
+        taskId: updatedTask.id,
+        createdBy: actor.sub,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
 
     return {
       task: updatedTask,
@@ -287,6 +302,16 @@ export class TasksService {
     const assignees = await this.taskAssigneeRepository.findByTaskId(taskId);
     const statuses = assignees.map((item) => item.status);
 
+    this.eventEmitter.emit(
+      TaskUpdatedEvent.eventName,
+      new TaskUpdatedEvent({
+        projectId: updatedTask.projectId,
+        taskId: updatedTask.id,
+        updatedBy: actor.sub,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
+
     return {
       task: updatedTask,
       assignees,
@@ -294,10 +319,7 @@ export class TasksService {
     };
   }
 
-  async deleteTask(
-    actor: AuthenticatedUser,
-    taskId: string,
-  ): Promise<void> {
+  async deleteTask(actor: AuthenticatedUser, taskId: string): Promise<void> {
     this.ensureTeamLead(actor.role);
 
     const task = await this.taskRepository.findById(taskId);
@@ -323,6 +345,16 @@ export class TasksService {
     }
 
     await this.cacheService.del(CacheKey.projectTasks(task.projectId));
+
+    this.eventEmitter.emit(
+      TaskDeletedEvent.eventName,
+      new TaskDeletedEvent({
+        projectId: task.projectId,
+        taskId: task.id,
+        deletedBy: actor.sub,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
   }
 
   async addAssignee(
@@ -345,7 +377,9 @@ export class TasksService {
     }
 
     if (project.isArchived) {
-      throw new BusinessRuleError('Cannot add assignee to task in archived project');
+      throw new BusinessRuleError(
+        'Cannot add assignee to task in archived project',
+      );
     }
 
     const membership = await this.projectMemberRepository.findActiveMembership(
@@ -390,6 +424,17 @@ export class TasksService {
 
     await this.cacheService.del(CacheKey.projectTasks(task.projectId));
 
+    this.eventEmitter.emit(
+      TaskAssigneeAddedEvent.eventName,
+      new TaskAssigneeAddedEvent({
+        projectId: task.projectId,
+        taskId: task.id,
+        userId,
+        addedBy: actor.sub,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
+
     return this.getTaskDetail(actor, taskId);
   }
 
@@ -431,6 +476,17 @@ export class TasksService {
     );
     await this.recalculateAndPersistSummaryStatus(taskId);
     await this.cacheService.del(CacheKey.projectTasks(task.projectId));
+
+    this.eventEmitter.emit(
+      TaskAssigneeRemovedEvent.eventName,
+      new TaskAssigneeRemovedEvent({
+        projectId: task.projectId,
+        taskId: task.id,
+        userId,
+        removedBy: actor.sub,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
 
     return this.getTaskDetail(actor, taskId);
   }

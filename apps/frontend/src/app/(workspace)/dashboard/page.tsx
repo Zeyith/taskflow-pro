@@ -53,7 +53,7 @@ export default function DashboardPage(): React.JSX.Element {
       value: summaryQuery.data?.openTasksCount ?? '--',
       description: 'Pending and in-progress work',
       icon: ListTodo,
-      href: '/tasks',
+      href: '/projects',
     },
     {
       title: 'Unread Notifications',

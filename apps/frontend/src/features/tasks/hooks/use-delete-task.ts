@@ -11,13 +11,17 @@ export function useDeleteTask(projectId: string) {
   return useMutation({
     mutationFn: deleteTaskRequest,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.projects.tasks(projectId),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.summary,
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.tasks(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.detail(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.summary,
+        }),
+      ]);
     },
   });
 }

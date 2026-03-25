@@ -255,12 +255,16 @@ export class ProjectsController {
     description: 'Project member removed successfully',
     schema: ProjectMemberResponseSwaggerSchema,
   })
-  async removeProjectMember(@Param() params: unknown) {
+  async removeProjectMember(
+    @Param() params: unknown,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const { id, userId } = projectMemberParamsSchema.parse(params);
 
     return this.projectsService.removeMember({
       projectId: id,
       userId,
+      removedBy: user.sub,
     });
   }
 

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { AuthorizationError } from '../../common/exceptions/authorization.exception';
 import { BusinessRuleError } from '../../common/exceptions/business-rule.exception';
@@ -10,6 +11,8 @@ import {
   TASK_ASSIGNEE_REPOSITORY,
   type ITaskAssigneeRepository,
 } from '../tasks/repositories/interfaces/task-assignee.repository.interface';
+import { ProjectMemberAddedEvent } from './events/project-member-added.event';
+import { ProjectMemberRemovedEvent } from './events/project-member-removed.event';
 import {
   PROJECT_MEMBER_REPOSITORY,
   type IProjectMemberRepository,
@@ -45,6 +48,7 @@ type AddProjectMemberInput = {
 type RemoveProjectMemberInput = {
   projectId: string;
   userId: string;
+  removedBy: string;
 };
 
 @Injectable()
@@ -57,6 +61,7 @@ export class ProjectsService {
     @Inject(TASK_ASSIGNEE_REPOSITORY)
     private readonly taskAssigneeRepository: ITaskAssigneeRepository,
     private readonly cacheService: CacheService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(input: CreateProjectInput) {
@@ -220,6 +225,16 @@ export class ProjectsService {
 
       await this.cacheService.del(CacheKey.projectTasks(input.projectId));
 
+      this.eventEmitter.emit(
+        ProjectMemberAddedEvent.eventName,
+        new ProjectMemberAddedEvent({
+          projectId: input.projectId,
+          userId: input.userId,
+          addedBy: input.addedBy,
+          occurredAt: new Date().toISOString(),
+        }),
+      );
+
       return this.toProjectMemberResponse(restoredMembership);
     }
 
@@ -230,6 +245,16 @@ export class ProjectsService {
     });
 
     await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+    this.eventEmitter.emit(
+      ProjectMemberAddedEvent.eventName,
+      new ProjectMemberAddedEvent({
+        projectId: input.projectId,
+        userId: input.userId,
+        addedBy: input.addedBy,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
 
     return this.toProjectMemberResponse(membership);
   }
@@ -265,6 +290,16 @@ export class ProjectsService {
     );
 
     await this.cacheService.del(CacheKey.projectTasks(input.projectId));
+
+    this.eventEmitter.emit(
+      ProjectMemberRemovedEvent.eventName,
+      new ProjectMemberRemovedEvent({
+        projectId: input.projectId,
+        userId: input.userId,
+        removedBy: input.removedBy,
+        occurredAt: new Date().toISOString(),
+      }),
+    );
 
     return this.toProjectMemberResponse(deletedMembership);
   }

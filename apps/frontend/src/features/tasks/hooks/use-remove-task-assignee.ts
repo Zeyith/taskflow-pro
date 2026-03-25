@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { removeTaskAssigneeRequest } from '@/features/tasks/api/remove-task-assignee';
 
 type RemoveTaskAssigneeParams = {
@@ -31,11 +32,19 @@ export function useRemoveTaskAssignee() {
       });
     },
     onSuccess: async (_data, variables) => {
-      toast.success('Task assignee removed successfully.');
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.tasks(variables.projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.detail(variables.projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.summary,
+        }),
+      ]);
 
-      await queryClient.invalidateQueries({
-        queryKey: ['project', variables.projectId, 'tasks'],
-      });
+      toast.success('Task assignee removed successfully.');
     },
     onError: (error: unknown) => {
       const message = axios.isAxiosError<ShieldErrorResponse>(error)

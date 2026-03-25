@@ -1,6 +1,9 @@
+'use client';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { updateTaskAssigneeStatusRequest } from '@/features/tasks/api/update-task-assignee-status';
 
 type UpdateTaskAssigneeStatusInput = {
@@ -16,9 +19,17 @@ export function useUpdateTaskAssigneeStatus() {
   return useMutation({
     mutationFn: updateTaskAssigneeStatusRequest,
     onSuccess: async (_, variables: UpdateTaskAssigneeStatusInput) => {
-      await queryClient.invalidateQueries({
-        queryKey: ['project', variables.projectId, 'tasks'],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.tasks(variables.projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects.detail(variables.projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.summary,
+        }),
+      ]);
 
       toast.success('Task status updated successfully.');
     },

@@ -45,6 +45,10 @@ import {
 import type { ProjectMember } from '@/types/project-member';
 import type { Task, TaskStatus } from '@/types/task';
 
+type ProjectScopedSocketEvent = {
+  projectId: string;
+};
+
 export default function ProjectDetailPage(): React.JSX.Element {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -104,71 +108,152 @@ export default function ProjectDetailPage(): React.JSX.Element {
   }, [members]);
 
   useEffect(() => {
-    if (!projectId || !accessToken || !user || !isAuthenticated) {
+  if (!projectId || !accessToken || !user || !isAuthenticated) {
+    return;
+  }
+
+  const socket = getSocket();
+
+  if (!socket) {
+    return;
+  }
+
+  const invalidateProjectRealtimeState = (): void => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.projects.tasks(projectId),
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.projects.members(projectId),
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.projects.detail(projectId),
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.projects.all,
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.summary,
+    });
+  };
+
+  const handleConnect = (): void => {
+    socket.emit(socketClientEvents.projectJoin, {
+      projectId,
+    });
+  };
+
+  const handleProjectScopedRealtimeEvent = (
+    event: ProjectScopedSocketEvent,
+  ): void => {
+    if (event.projectId !== projectId) {
       return;
     }
 
-    const socket = getSocket();
+    invalidateProjectRealtimeState();
+  };
 
-    if (!socket) {
-      return;
-    }
+  socket.on('connect', handleConnect);
 
-    const handleConnect = (): void => {
-      socket.emit(socketClientEvents.projectJoin, {
-        projectId,
-      });
-    };
+  socket.on(
+    socketServerEvents.taskAssignmentStatusChanged,
+    handleProjectScopedRealtimeEvent,
+  );
 
-    const handleTaskAssignmentStatusChanged = (event: {
-      projectId: string;
-      taskId: string;
-      assigneeUserId: string;
-      oldStatus: TaskStatus;
-      newStatus: TaskStatus;
-      changedBy: string;
-      summaryStatus: TaskStatus;
-      occurredAt: string;
-    }): void => {
-      if (event.projectId !== projectId) {
-        return;
-      }
+  socket.on(
+    socketServerEvents.projectMemberAdded,
+    handleProjectScopedRealtimeEvent,
+  );
 
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.projects.tasks(projectId),
-      });
+  socket.on(
+    socketServerEvents.projectMemberRemoved,
+    handleProjectScopedRealtimeEvent,
+  );
 
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.summary,
-      });
-    };
+  socket.on(
+    socketServerEvents.taskCreated,
+    handleProjectScopedRealtimeEvent,
+  );
 
-    socket.on('connect', handleConnect);
-    socket.on(
+  socket.on(
+    socketServerEvents.taskUpdated,
+    handleProjectScopedRealtimeEvent,
+  );
+
+  socket.on(
+    socketServerEvents.taskDeleted,
+    handleProjectScopedRealtimeEvent,
+  );
+
+  socket.on(
+    socketServerEvents.taskAssigneeAdded,
+    handleProjectScopedRealtimeEvent,
+  );
+
+  socket.on(
+    socketServerEvents.taskAssigneeRemoved,
+    handleProjectScopedRealtimeEvent,
+  );
+
+  if (socket.connected) {
+    socket.emit(socketClientEvents.projectJoin, {
+      projectId,
+    });
+  }
+
+  return () => {
+    socket.off('connect', handleConnect);
+
+    socket.off(
       socketServerEvents.taskAssignmentStatusChanged,
-      handleTaskAssignmentStatusChanged,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.projectMemberAdded,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.projectMemberRemoved,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.taskCreated,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.taskUpdated,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.taskDeleted,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.taskAssigneeAdded,
+      handleProjectScopedRealtimeEvent,
+    );
+
+    socket.off(
+      socketServerEvents.taskAssigneeRemoved,
+      handleProjectScopedRealtimeEvent,
     );
 
     if (socket.connected) {
-      socket.emit(socketClientEvents.projectJoin, {
+      socket.emit(socketClientEvents.projectLeave, {
         projectId,
       });
     }
-
-    return () => {
-      socket.off('connect', handleConnect);
-      socket.off(
-        socketServerEvents.taskAssignmentStatusChanged,
-        handleTaskAssignmentStatusChanged,
-      );
-
-      if (socket.connected) {
-        socket.emit(socketClientEvents.projectLeave, {
-          projectId,
-        });
-      }
-    };
-  }, [accessToken, isAuthenticated, projectId, queryClient, user]);
+  };
+}, [accessToken, isAuthenticated, projectId, queryClient, user]);
 
   const handleCreateTask = async (
     values: CreateTaskFormValues,
@@ -212,7 +297,7 @@ export default function ProjectDetailPage(): React.JSX.Element {
     }
   };
 
-    const handleEditTask = async (
+  const handleEditTask = async (
     values: UpdateTaskFormValues,
   ): Promise<void> => {
     if (!selectedTaskForEdit) {
