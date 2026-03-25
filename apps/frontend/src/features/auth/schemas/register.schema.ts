@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
 const taskflowEmailSchema = z
-  .string()
-  .trim()
-  .email('Please enter a valid email address.')
+  .email({ message: 'Please enter a valid email address.' })
+  .transform((value) => value.trim())
   .refine((value) => value.toLowerCase().endsWith('@taskflow.com'), {
     message: 'Email must end with @taskflow.com',
   });
