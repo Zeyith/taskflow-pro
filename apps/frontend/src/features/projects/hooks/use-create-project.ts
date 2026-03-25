@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { createProjectRequest } from '@/features/projects/api/create-project';
 import type { CreateProjectFormValues } from '@/features/projects/schemas/create-project.schema';
 
@@ -12,11 +13,11 @@ export function useCreateProject() {
       createProjectRequest(values),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ['projects'],
+        queryKey: queryKeys.projects.all,
       });
 
       await queryClient.invalidateQueries({
-        queryKey: ['dashboard', 'summary'],
+        queryKey: queryKeys.dashboard.summary,
       });
 
       toast.success('Project created successfully.');

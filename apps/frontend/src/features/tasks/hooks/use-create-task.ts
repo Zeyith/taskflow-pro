@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
 
+import { queryKeys } from '@/constants/query-keys';
 import { createTaskRequest } from '@/features/tasks/api/create-task';
 import type { CreateTaskFormValues } from '@/features/tasks/schema/create-task.schema';
 
@@ -19,11 +20,11 @@ export function useCreateTask(projectId: string) {
       createTaskRequest(projectId, values),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ['project', projectId, 'tasks'],
+        queryKey: queryKeys.projects.tasks(projectId),
       });
 
       await queryClient.invalidateQueries({
-        queryKey: ['dashboard', 'summary'],
+        queryKey: queryKeys.dashboard.summary,
       });
 
       toast.success('Task created successfully.');
