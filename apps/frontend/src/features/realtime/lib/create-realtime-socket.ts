@@ -10,13 +10,25 @@ function getSocketNamespace(): string {
   return process.env.NEXT_PUBLIC_SOCKET_NAMESPACE ?? '/realtime';
 }
 
+function normalizeSocketToken(accessToken: string): string {
+  const trimmedToken = accessToken.trim();
+
+  if (trimmedToken.toLowerCase().startsWith('bearer ')) {
+    return trimmedToken.slice('bearer '.length).trim();
+  }
+
+  return trimmedToken;
+}
+
 export function createRealtimeSocket(accessToken: string): RealtimeSocket {
+  const normalizedToken = normalizeSocketToken(accessToken);
+
   return io(`${getSocketUrl()}${getSocketNamespace()}`, {
     transports: ['websocket'],
     withCredentials: true,
-    autoConnect: true,
+    autoConnect: false,
     auth: {
-      token: accessToken,
+      token: normalizedToken,
     },
   });
 }

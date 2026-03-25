@@ -1,13 +1,13 @@
 export const apiEndpoints = {
   auth: {
-    login: "/auth/login",
-    me: "/auth/me",
-    register: "/auth/register",
+    login: '/auth/login',
+    me: '/auth/me',
+    register: '/auth/register',
   },
 
   projects: {
-    list: "/projects",
-    create: "/projects",
+    list: '/projects',
+    create: '/projects',
     detail: (projectId: string) => `/projects/${projectId}`,
     archive: (projectId: string) => `/projects/${projectId}/archive`,
     members: (projectId: string) => `/projects/${projectId}/members`,
@@ -19,7 +19,7 @@ export const apiEndpoints = {
   },
 
   tasks: {
-    create: "/tasks",
+    create: '/tasks',
     detail: (taskId: string) => `/tasks/${taskId}`,
     update: (taskId: string) => `/tasks/${taskId}`,
     delete: (taskId: string) => `/tasks/${taskId}`,
@@ -31,23 +31,24 @@ export const apiEndpoints = {
   },
 
   notifications: {
-    list: "/notifications",
-    unreadCount: "/notifications/unread-count",
+    list: '/notifications',
+    unreadCount: '/notifications/unread-count',
     markRead: (notificationId: string) =>
       `/notifications/${notificationId}/read`,
-    markAllRead: "/notifications/read-all",
+    markAllRead: '/notifications/read-all',
     delete: (notificationId: string) => `/notifications/${notificationId}`,
   },
 
   incidents: {
-    list: "/incidents",
-    create: "/incidents",
+    list: '/incidents',
+    create: '/incidents',
     detail: (incidentId: string) => `/incidents/${incidentId}`,
     byId: (incidentId: string) => `/incidents/${incidentId}`,
     close: (incidentId: string) => `/incidents/${incidentId}/close`,
   },
 
   users: {
-    list: "/users",
+    list: '/users',
+    changeOwnPassword: (userId: string) => `/users/${userId}/password`,
   },
 } as const;

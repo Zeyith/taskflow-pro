@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { isAxiosError } from 'axios';
 import { BellRing, RefreshCcw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,10 +25,7 @@ import { formatDateTime } from '@/lib/utils/format-date';
 
 const PAGE_SIZE = 20;
 
-function getApiErrorMessage(
-  error: unknown,
-  fallbackMessage: string,
-): string {
+function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
   if (!isAxiosError(error)) {
     return fallbackMessage;
   }
@@ -72,19 +69,9 @@ export default function NotificationsPage(): JSX.Element {
   const notifications = notificationsQuery.data?.data ?? [];
   const unreadCount = unreadCountQuery.data?.count ?? 0;
   const total = notificationsQuery.data?.meta?.total ?? 0;
-
-  useEffect(() => {
-    if (notificationsQuery.isLoading || notificationsQuery.data === undefined) {
-      return;
-    }
-
-    const lastValidOffset =
-      total > 0 ? Math.floor((total - 1) / limit) * limit : 0;
-
-    if (offset > lastValidOffset) {
-      setOffset(lastValidOffset);
-    }
-  }, [limit, notificationsQuery.data, notificationsQuery.isLoading, offset, total]);
+  const lastValidOffset =
+    total > 0 ? Math.floor((total - 1) / limit) * limit : 0;
+  const safeOffset = offset > lastValidOffset ? lastValidOffset : offset;
 
   async function handleMarkAsRead(notificationId: string): Promise<void> {
     try {
@@ -194,10 +181,10 @@ export default function NotificationsPage(): JSX.Element {
     markAsReadMutation.isPending ||
     markAllAsReadMutation.isPending ||
     deleteNotificationMutation.isPending;
-  const currentPage = Math.floor(offset / limit) + 1;
+  const currentPage = Math.floor(safeOffset / limit) + 1;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
-  const hasPreviousPage = offset > 0;
-  const hasNextPage = offset + limit < total;
+  const hasPreviousPage = safeOffset > 0;
+  const hasNextPage = safeOffset + limit < total;
 
   return (
     <section className="space-y-6">
@@ -413,7 +400,9 @@ export default function NotificationsPage(): JSX.Element {
                         return;
                       }
 
-                      setOffset((currentOffset) => currentOffset + limit);
+                      setOffset((currentOffset) =>
+                        Math.min(lastValidOffset, currentOffset + limit),
+                      );
                     }}
                     className={
                       !hasNextPage || isRefreshing

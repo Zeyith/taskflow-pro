@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StateCreator } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { AuthUser } from '@/types/auth';
@@ -14,47 +14,51 @@ type AuthState = {
   setHasHydrated: (value: boolean) => void;
 };
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
+type PersistedAuthState = Pick<
+  AuthState,
+  'accessToken' | 'user' | 'isAuthenticated'
+>;
+
+const authStoreCreator: StateCreator<AuthState> = (set) => ({
+  accessToken: null,
+  user: null,
+  hasHydrated: false,
+  isAuthenticated: false,
+  setAccessToken: (accessToken: string) => {
+    set({
+      accessToken,
+      isAuthenticated: true,
+    });
+  },
+  setUser: (user: AuthUser) => {
+    set({
+      user,
+      isAuthenticated: true,
+    });
+  },
+  clearSession: () => {
+    set({
       accessToken: null,
       user: null,
-      hasHydrated: false,
       isAuthenticated: false,
-      setAccessToken: (accessToken) => {
-        set({
-          accessToken,
-          isAuthenticated: true,
-        });
-      },
-      setUser: (user) => {
-        set({
-          user,
-          isAuthenticated: true,
-        });
-      },
-      clearSession: () => {
-        set({
-          accessToken: null,
-          user: null,
-          isAuthenticated: false,
-        });
-      },
-      setHasHydrated: (value) => {
-        set({ hasHydrated: value });
-      },
+    });
+  },
+  setHasHydrated: (value: boolean) => {
+    set({ hasHydrated: value });
+  },
+});
+
+export const useAuthStore = create<AuthState>()(
+  persist(authStoreCreator, {
+    name: 'taskflow-pro-auth',
+    storage: createJSONStorage(() => localStorage),
+    partialize: (state: AuthState): PersistedAuthState => ({
+      accessToken: state.accessToken,
+      user: state.user,
+      isAuthenticated: state.isAuthenticated,
     }),
-    {
-      name: 'taskflow-pro-auth',
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        accessToken: state.accessToken,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
+    onRehydrateStorage: () => (state?: AuthState) => {
+      state?.setHasHydrated(true);
     },
-  ),
+  }),
 );

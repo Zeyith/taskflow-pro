@@ -47,63 +47,37 @@ export function RealtimeProvider({
   );
 
   useEffect(() => {
-    if (!hasHydrated || !isAuthenticated || !accessToken) {
-      return;
+  if (!hasHydrated || !isAuthenticated || !accessToken) {
+    return;
+  }
+
+  const normalizedToken = accessToken.trim();
+
+  if (!normalizedToken) {
+    return;
+  }
+
+  const socket = createRealtimeSocket(normalizedToken);
+
+  socket.on(realtimeEvent.connectionEstablished, () => {
+    for (const projectId of projectIds) {
+      socket.emit(realtimeEvent.projectJoin, {
+        projectId,
+      });
     }
+  });
 
-    const socket = createRealtimeSocket(accessToken);
-
-    socket.on(realtimeEvent.connectionEstablished, () => {
-      for (const projectId of projectIds) {
-        socket.emit(realtimeEvent.projectJoin, {
-          projectId,
-        });
-      }
-    });
-
-    socket.on(
-      realtimeEvent.incidentCreated,
-      (payload: IncidentCreatedPayload) => {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.incidents.all,
-        });
-
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.projects.all,
-        });
-
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.all,
-        });
-
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.notifications.unreadCount,
-        });
-
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.dashboard.summary,
-        });
-
-        showIncidentToast({
-          incident: payload,
-          onClick: () => {
-            void router.push('/incidents');
-          },
-        });
-      },
-    );
-
-    socket.on(realtimeEvent.incidentResolved, () => {
+  socket.on(
+    realtimeEvent.incidentCreated,
+    (payload: IncidentCreatedPayload) => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.incidents.all,
       });
 
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.summary,
+        queryKey: queryKeys.projects.all,
       });
-    });
 
-    socket.on(realtimeEvent.notificationCreated, () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.notifications.all,
       });
@@ -115,35 +89,70 @@ export function RealtimeProvider({
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.summary,
       });
+
+      showIncidentToast({
+        incident: payload,
+        onClick: () => {
+          void router.push('/incidents');
+        },
+      });
+    },
+  );
+
+  socket.on(realtimeEvent.incidentResolved, () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.incidents.all,
     });
 
-    socket.on(realtimeEvent.notificationUnreadCountUpdated, () => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.notifications.unreadCount,
-      });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.summary,
+    });
+  });
 
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.summary,
-      });
+  socket.on(realtimeEvent.notificationCreated, () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.all,
     });
 
-    socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.dashboard.summary,
-      });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.unreadCount,
     });
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [
-    accessToken,
-    hasHydrated,
-    isAuthenticated,
-    projectIds,
-    queryClient,
-    router,
-  ]);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.summary,
+    });
+  });
+
+  socket.on(realtimeEvent.notificationUnreadCountUpdated, () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.unreadCount,
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.summary,
+    });
+  });
+
+  socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.summary,
+    });
+  });
+
+  socket.connect();
+
+  return () => {
+    socket.removeAllListeners();
+    socket.disconnect();
+  };
+}, [
+  accessToken,
+  hasHydrated,
+  isAuthenticated,
+  projectIds,
+  queryClient,
+  router,
+]);
 
   return <>{children}</>;
 }

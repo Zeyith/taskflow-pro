@@ -60,6 +60,10 @@ export function LoginForm(): React.JSX.Element {
     }
   }
 
+  function handleForgotPasswordClick(): void {
+    toast.info('This feature is not activated yet.');
+  }
+
   return (
     <Card className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.045] shadow-[0_24px_90px_rgba(0,0,0,0.5)] backdrop-blur-xl">
       <CardContent className="p-0">
@@ -147,6 +151,16 @@ export function LoginForm(): React.JSX.Element {
                   </FormItem>
                 )}
               />
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleForgotPasswordClick}
+                  className="text-sm font-medium text-zinc-300 underline underline-offset-4 transition hover:text-white"
+                >
+                  Forgot password?
+                </button>
+              </div>
 
               <Button
                 type="submit"

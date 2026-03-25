@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   BellRing,
@@ -6,15 +6,15 @@ import {
   LayoutDashboard,
   ShieldAlert,
   X,
-} from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { sidebarItems } from '@/constants/navigation';
-import { useAuth } from '@/features/auth/hooks/use-auth';
-import { cn } from '@/lib/utils';
-import { ThemeToggle } from '@/components/shared/theme-toggle';
-import { Button } from '@/components/ui/button';
+import { sidebarItems } from "@/constants/navigation";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { Button } from "@/components/ui/button";
 
 const sidebarIcons = {
   Dashboard: LayoutDashboard,
@@ -52,16 +52,20 @@ export function AppSidebar({
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 transform border-r bg-background transition-transform duration-200 lg:static lg:z-auto lg:block lg:translate-x-0',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          "fixed inset-y-0 left-0 z-50 w-72 transform border-r bg-background transition-transform duration-200 lg:static lg:z-auto lg:block lg:translate-x-0",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between border-b px-6 py-6 lg:block">
             <div>
-              <div className="inline-flex items-center rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              <Link
+                href="/dashboard"
+                onClick={onCloseMobile}
+                className="inline-flex items-center rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
                 TaskFlow Pro
-              </div>
+              </Link>
 
               <div className="mt-4 space-y-1">
                 <p className="text-lg font-semibold tracking-tight text-foreground">
@@ -99,10 +103,10 @@ export function AppSidebar({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-colors',
+                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-colors",
                     isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                   )}
                   onClick={onCloseMobile}
                 >

@@ -220,36 +220,48 @@ export class RealtimeGateway
     const token = this.extractToken(client);
 
     if (!token) {
-      client.disconnect();
+      client.disconnect(true);
       return;
     }
 
-    const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(
-      token,
-      {
-        secret: this.appConfig.jwt.secret,
-      },
-    );
+    try {
+      const payload = await this.jwtService.verifyAsync<AuthenticatedUser>(
+        token,
+        {
+          secret: this.appConfig.jwt.secret,
+        },
+      );
 
-    client.data.user = payload;
+      client.data.user = payload;
 
-    this.connectionManager.addConnection(payload.sub, client.id);
+      this.connectionManager.addConnection(payload.sub, client.id);
 
-    await client.join(RealtimeRoom.user(payload.sub));
+      await client.join(RealtimeRoom.user(payload.sub));
 
-    client.emit(RealtimeEvent.connectionEstablished, {
-      userId: payload.sub,
-      socketId: client.id,
-    });
-
-    this.logger.log(
-      JSON.stringify({
-        message: 'Realtime client connected',
+      client.emit(RealtimeEvent.connectionEstablished, {
         userId: payload.sub,
         socketId: client.id,
-        timestamp: new Date().toISOString(),
-      }),
-    );
+      });
+
+      this.logger.log(
+        JSON.stringify({
+          message: 'Realtime client connected',
+          userId: payload.sub,
+          socketId: client.id,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      this.logger.warn(
+        JSON.stringify({
+          message: 'Realtime client authentication failed',
+          socketId: client.id,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+
+      client.disconnect(true);
+    }
   }
 
   async handleDisconnect(client: AppSocket): Promise<void> {
