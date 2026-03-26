@@ -2,11 +2,14 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { queryKeys } from '@/constants/query-keys';
 import { useProjects } from '@/features/projects/hooks/use-projects';
-import { createRealtimeSocket } from '@/features/realtime/lib/create-realtime-socket';
+import {
+  createRealtimeSocket,
+  type RealtimeSocket,
+} from '@/features/realtime/lib/create-realtime-socket';
 import { showIncidentToast } from '@/features/realtime/lib/show-incident-toast';
 import { realtimeEvent } from '@/features/realtime/realtime.constants';
 import { useAuthStore } from '@/stores/auth.store';
@@ -33,6 +36,8 @@ export function RealtimeProvider({
 }: RealtimeProviderProps): React.JSX.Element {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const socketRef = useRef<RealtimeSocket | null>(null);
+  const joinedProjectIdsRef = useRef<Set<string>>(new Set());
 
   const accessToken = useAuthStore((state) => state.accessToken);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -47,37 +52,63 @@ export function RealtimeProvider({
   );
 
   useEffect(() => {
-  if (!hasHydrated || !isAuthenticated || !accessToken) {
-    return;
-  }
-
-  const normalizedToken = accessToken.trim();
-
-  if (!normalizedToken) {
-    return;
-  }
-
-  const socket = createRealtimeSocket(normalizedToken);
-
-  socket.on(realtimeEvent.connectionEstablished, () => {
-    for (const projectId of projectIds) {
-      socket.emit(realtimeEvent.projectJoin, {
-        projectId,
-      });
+    if (!hasHydrated || !isAuthenticated || !accessToken) {
+      return;
     }
-  });
 
-  socket.on(
-    realtimeEvent.incidentCreated,
-    (payload: IncidentCreatedPayload) => {
+    const normalizedToken = accessToken.trim();
+
+    if (!normalizedToken) {
+      return;
+    }
+
+    const socket = createRealtimeSocket(normalizedToken);
+    socketRef.current = socket;
+    joinedProjectIdsRef.current.clear();
+
+    socket.on(
+      realtimeEvent.incidentCreated,
+      (payload: IncidentCreatedPayload) => {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.incidents.all,
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: ['projects'],
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.notifications.all,
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.notifications.unreadCount,
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.summary,
+        });
+
+        showIncidentToast({
+          incident: payload,
+          onClick: () => {
+            void router.push('/incidents');
+          },
+        });
+      },
+    );
+
+    socket.on(realtimeEvent.incidentResolved, () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.incidents.all,
       });
 
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.projects.all,
+        queryKey: queryKeys.dashboard.summary,
       });
+    });
 
+    socket.on(realtimeEvent.notificationCreated, () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.notifications.all,
       });
@@ -89,90 +120,93 @@ export function RealtimeProvider({
       void queryClient.invalidateQueries({
         queryKey: queryKeys.dashboard.summary,
       });
+    });
 
-      showIncidentToast({
-        incident: payload,
-        onClick: () => {
-          void router.push('/incidents');
-        },
+    socket.on(realtimeEvent.notificationUnreadCountUpdated, () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount,
       });
-    },
-  );
 
-  socket.on(realtimeEvent.incidentResolved, () => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.incidents.all,
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
+      });
     });
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.dashboard.summary,
-    });
-  });
+    socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.summary,
+      });
 
-  socket.on(realtimeEvent.notificationCreated, () => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.notifications.all,
-    });
+      void queryClient.invalidateQueries({
+        queryKey: ['projects'],
+      });
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.notifications.unreadCount,
-    });
+      void queryClient.invalidateQueries({
+        queryKey: ['tasks'],
+      });
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.dashboard.summary,
-    });
-  });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.all,
+      });
 
-  socket.on(realtimeEvent.notificationUnreadCountUpdated, () => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.notifications.unreadCount,
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount,
+      });
     });
 
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.dashboard.summary,
-    });
-  });
+    return () => {
+      joinedProjectIdsRef.current.clear();
+      socket.removeAllListeners();
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [accessToken, hasHydrated, isAuthenticated, queryClient, router]);
 
-  socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
-  void queryClient.invalidateQueries({
-    queryKey: queryKeys.dashboard.summary,
-  });
+  useEffect(() => {
+    const socket = socketRef.current;
 
-  void queryClient.invalidateQueries({
-    queryKey: queryKeys.projects.all,
-  });
+    if (!socket || !socket.connected || projectIds.length === 0) {
+      return;
+    }
 
-  void queryClient.invalidateQueries({
-    queryKey: ['projects'],
-  });
+    for (const projectId of projectIds) {
+      if (joinedProjectIdsRef.current.has(projectId)) {
+        continue;
+      }
 
-  void queryClient.invalidateQueries({
-    queryKey: ['tasks'],
-  });
+      socket.emit(realtimeEvent.projectJoin, { projectId });
+      joinedProjectIdsRef.current.add(projectId);
+    }
+  }, [projectIds]);
 
-  void queryClient.invalidateQueries({
-    queryKey: queryKeys.notifications.all,
-  });
+  useEffect(() => {
+  const socketInstance = socketRef.current;
 
-  void queryClient.invalidateQueries({
-    queryKey: queryKeys.notifications.unreadCount,
-  });
-});
+  if (!socketInstance) {
+    return;
+  }
 
-  socket.connect();
+  function handleConnected(): void {
+    const activeSocket = socketRef.current;
+
+    if (!activeSocket) {
+      return;
+    }
+
+    joinedProjectIdsRef.current.clear();
+
+    for (const projectId of projectIds) {
+      activeSocket.emit(realtimeEvent.projectJoin, { projectId });
+      joinedProjectIdsRef.current.add(projectId);
+    }
+  }
+
+  socketInstance.on(realtimeEvent.connectionEstablished, handleConnected);
 
   return () => {
-    socket.removeAllListeners();
-    socket.disconnect();
+    socketInstance.off(realtimeEvent.connectionEstablished, handleConnected);
   };
-}, [
-  accessToken,
-  hasHydrated,
-  isAuthenticated,
-  projectIds,
-  queryClient,
-  router,
-]);
+}, [projectIds]);
 
   return <>{children}</>;
 }
