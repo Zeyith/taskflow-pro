@@ -7,8 +7,8 @@ import { PageLoader } from '@/components/common/page-loader';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 import { appRoutes } from '@/constants/routes';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { RealtimeProvider } from '@/features/realtime/providers/realtime-provider';
 import { useHydrated } from '@/hooks/use-hydrated';
-import { useWorkspaceSocket } from '@/lib/socket/use-workspace-socket';
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -20,8 +20,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const hydrated = useHydrated();
   const { isAuthenticated, hasHydrated } = useAuth();
-
-  useWorkspaceSocket();
 
   useEffect(() => {
     if (!hydrated || !hasHydrated) {
@@ -41,5 +39,9 @@ export default function DashboardLayout({
     return <PageLoader />;
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <RealtimeProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </RealtimeProvider>
+  );
 }
