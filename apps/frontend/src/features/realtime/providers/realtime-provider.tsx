@@ -134,10 +134,30 @@ export function RealtimeProvider({
   });
 
   socket.on(realtimeEvent.taskAssignmentStatusChanged, () => {
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.dashboard.summary,
-    });
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.dashboard.summary,
   });
+
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.projects.all,
+  });
+
+  void queryClient.invalidateQueries({
+    queryKey: ['projects'],
+  });
+
+  void queryClient.invalidateQueries({
+    queryKey: ['tasks'],
+  });
+
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.notifications.all,
+  });
+
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.notifications.unreadCount,
+  });
+});
 
   socket.connect();
 
